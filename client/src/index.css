@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-gray-50 font-sans;
+}
+.hero {
+  background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+  color: white;
+  padding: 60px;
+  text-align: center;
+}
+
+section {
+  padding: 40px;
+}
+
+h1, h2 {
+  margin-bottom: 15px;
+}
