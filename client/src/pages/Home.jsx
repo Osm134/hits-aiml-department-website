@@ -164,13 +164,12 @@ export default function Home() {
   };
 
   /* -------------------- QUICK LINKS -------------------- */
-  const quickLinks = [
-    { title: "Study Materials", path: "/academics", state: { section: "notes" }, icon: <Book className="w-8 h-8 mb-1" />, color: "from-blue-400 to-blue-600" },
-    { title: "Previous Papers", path: "/academics", state: { section: "papers" }, icon: <FileText className="w-8 h-8 mb-1" />, color: "from-green-400 to-green-600" },
-    { title: "Exam Timetable", path: "/academics", state: { section: "timetable" }, icon: <Calendar className="w-8 h-8 mb-1" />, color: "from-yellow-400 to-yellow-600" },
-    { title: "Academic Calendar", path: "/academics", state: { section: "calendar" }, icon: <ClipboardList className="w-8 h-8 mb-1" />, color: "from-purple-400 to-purple-600" },
-    { title: "Syllabus", path: "/academics", state: { section: "syllabus" }, icon: <File className="w-8 h-8 mb-1" />, color: "from-pink-400 to-pink-600" },
-  ];
+ const quickLinks = [
+  { title: "Previous Papers", path: "/academics", state: { section: "papers" }, icon: <FileText className="w-8 h-8 mb-1" />, color: "from-green-400 to-green-600" },
+  { title: "Exam Timetable", path: "/academics", state: { section: "timetable" }, icon: <Calendar className="w-8 h-8 mb-1" />, color: "from-yellow-400 to-yellow-600" },
+  { title: "Academic Calendar", path: "/academics", state: { section: "calendar" }, icon: <ClipboardList className="w-8 h-8 mb-1" />, color: "from-purple-400 to-purple-600" },
+  { title: "Syllabus", path: "/academics", state: { section: "syllabus" }, icon: <File className="w-8 h-8 mb-1" />, color: "from-pink-400 to-pink-600" },
+];
 
   return (
     <div className="bg-gray-50 font-sans text-gray-800 min-h-screen">
@@ -187,14 +186,38 @@ export default function Home() {
             Explore Academics
           </button>
         </div>
-        <div className="bg-white rounded-3xl shadow-xl overflow-hidden transform hover:scale-105 transition duration-300">
-          <img src="/hod.jpg" alt="HOD" className="w-full h-52 sm:h-64 object-cover" />
-          <div className="p-5 text-center">
-            <h3 className="font-bold text-[#0B3C78] text-lg">Dr. Sumitha Bhashini</h3>
-            <p className="text-sm text-gray-600">HOD, AIML Department</p>
-            <p className="text-sm mt-2 text-gray-600">Empowering the next generation of AI & ML innovators.</p>
-          </div>
-        </div>
+       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+
+  {/* IMAGE */}
+  <div className="w-full h-56 sm:h-64 md:h-72 bg-gray-100 flex items-center justify-center">
+    <img
+      src="/hod.jpg"
+      alt="Dr. Sumitha Bhashini - HOD AIML"
+      className="h-full w-auto object-contain"
+    />
+  </div>
+
+  {/* CONTENT */}
+  <div className="px-5 py-4 text-center">
+    <h3 className="text-base sm:text-lg font-semibold text-[#0B3C78]">
+      Dr. Sumitha Bhashini
+    </h3>
+
+    <p className="mt-1 text-sm text-gray-600 font-medium">
+      Head of the Department
+    </p>
+
+    <p className="text-sm text-gray-500">
+      Artificial Intelligence & Machine Learning
+    </p>
+
+    <div className="w-12 h-[2px] bg-[#C79A2B] mx-auto my-3"></div>
+
+    
+  </div>
+
+</div>
+
       </div>
 
       {/* -------------------- UPDATES + HIGHLIGHT -------------------- */}
@@ -376,15 +399,43 @@ export default function Home() {
       </div>
 
       {/* -------------------- QUICK LINKS -------------------- */}
-      <h2 className="text-3xl font-bold mb-6 text-[#0B3C78] text-center">QUICK LINKS</h2>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-12">
-        {quickLinks.map((link, idx) => (
-          <Link key={idx} to={link.path} state={link.state} className={`flex flex-col items-center justify-center p-4 rounded-2xl text-white font-semibold shadow hover:scale-105 transition transform bg-gradient-to-br ${link.color}`}>
-            {link.icon}
-            <span className="text-center text-sm sm:text-base">{link.title}</span>
-          </Link>
-        ))}
-      </div>
+     {/* -------------------- QUICK LINKS -------------------- */}
+<h2 className="text-2xl sm:text-3xl font-bold mb-6 text-[#0B3C78] text-center">
+  QUICK LINKS
+</h2>
+
+<div className="
+  max-w-6xl mx-auto px-4 sm:px-6 
+  grid grid-cols-2 
+  sm:grid-cols-2 
+  md:grid-cols-4 
+  gap-4 sm:gap-6 
+  mb-12
+">
+  {quickLinks.map((link, idx) => (
+    <Link
+      key={idx}
+      to={link.path}
+      state={link.state}
+      className={`
+        flex flex-col items-center justify-center 
+        p-5 sm:p-6 
+        rounded-2xl 
+        text-white font-semibold 
+        shadow-lg 
+        hover:scale-105 active:scale-95
+        transition-transform duration-200
+        bg-gradient-to-br ${link.color}
+      `}
+    >
+      {link.icon}
+      <span className="text-center text-sm sm:text-base">
+        {link.title}
+      </span>
+    </Link>
+  ))}
+</div>
+
 
       {/* -------------------- FOOTER -------------------- */}
       <footer className="bg-[#0B3C78] text-white py-8 mt-12">
