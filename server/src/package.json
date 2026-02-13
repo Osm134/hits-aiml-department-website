@@ -1,20 +1,17 @@
 {
   "name": "hits-aiml-department-server",
   "version": "1.0.0",
-  "description": "Backend for HITSAIML Department Website",
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "keywords": [],
-  "author": "Jangeti Srikanth",
-  "license": "ISC",
   "dependencies": {
-    "bcryptjs": "^3.0.3",
+    "express": "^5.2.1",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
-    "express": "^5.2.1",
+    "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
     "pg": "^8.18.0"
