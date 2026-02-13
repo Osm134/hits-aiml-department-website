@@ -20,7 +20,8 @@ const __dirname = path.dirname(__filename);
 /* ================= MIDDLEWARE ================= */
 app.use(cors());
 app.use(express.json());
-app.use("/uploads", express.static("uploads"));
+// Serve files from uploads folder
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* ================= DATABASE ================= */
 const db = new pg.Client({
