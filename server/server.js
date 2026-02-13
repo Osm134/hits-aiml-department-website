@@ -30,17 +30,19 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* ================= DATABASE ================= */
-const db = new pg.Client({
+const pool = new pg.Pool({
+
   user: process.env.PG_USER,
   host: process.env.PG_HOST,
   database: process.env.PG_DATABASE,
   password:  String(process.env.PG_PASSWORD),
   port: Number(process.env.PG_PORT),
+
 });
 
-db.connect()
+pool.connect()
   .then(() => console.log("✅ PostgreSQL Connected"))
-  .catch(err => console.error("❌ DB Error:", err));
+  .catch(err => console.error("❌ pool Error:", err));
 
 /* ================= FILE UPLOAD ================= */
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
@@ -85,7 +87,7 @@ app.post("/register", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    const exists = await db.query(
+    const exists = await pool.query(
       "SELECT id FROM users WHERE email=$1",
       [email]
     );
@@ -93,7 +95,7 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
-    const result = await db.query(
+    const result = await pool.query(
       "INSERT INTO users(name,email,password,role) VALUES($1,$2,$3,$4) RETURNING id,name,email,role",
       [name, email, hashed, role]
     );
@@ -108,7 +110,7 @@ app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const result = await db.query(
+    const result = await pool.query(
       "SELECT * FROM users WHERE email=$1",
       [email]
     );
@@ -135,7 +137,7 @@ app.post("/login", async (req, res) => {
 /* ================= DAILY UPDATES ================= */
 app.post("/updates", async (req, res) => {
   const { title, description, image_url } = req.body;
-  const result = await db.query(
+  const result = await pool.query(
     "INSERT INTO daily_updates(title,description,image_url) VALUES($1,$2,$3) RETURNING *",
     [title, description, image_url]
   );
@@ -143,7 +145,7 @@ app.post("/updates", async (req, res) => {
 });
 
 app.get("/updates", async (_, res) => {
-  const result = await db.query(
+  const result = await pool.query(
     "SELECT * FROM daily_updates ORDER BY created_at DESC"
   );
   res.json(result.rows);
@@ -153,7 +155,7 @@ app.put("/updates/:id", async (req, res) => {
     const { id } = req.params;
     const { title, description } = req.body;
 
-    const result = await db.query(
+    const result = await pool.query(
       "UPDATE daily_updates SET title=$1, description=$2 WHERE id=$3 RETURNING *",
       [title, description, id]
     );
@@ -169,7 +171,7 @@ app.put("/updates/:id", async (req, res) => {
 app.delete("/updates/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    await db.query("DELETE FROM daily_updates WHERE id=$1", [id]);
+    await pool.query("DELETE FROM daily_updates WHERE id=$1", [id]);
     res.json({ message: "Update deleted ✅" });
   } catch (err) {
     console.error(err);
@@ -182,7 +184,7 @@ app.delete("/updates/:id", async (req, res) => {
 // Get the latest highlight
 app.get("/academic-highlights", async (_, res) => {
   try {
-    const result = await db.query(
+    const result = await pool.query(
       "SELECT * FROM academic_highlights ORDER BY created_at DESC LIMIT 1"
     );
     res.json(result.rows);
@@ -199,20 +201,20 @@ app.post("/academic-highlights", async (req, res) => {
     const { title, description } = req.body;
 
     // Check if highlight exists
-    const existing = await db.query("SELECT id FROM academic_highlights LIMIT 1");
+    const existing = await pool.query("SELECT id FROM academic_highlights LIMIT 1");
 
     let result;
     if (existing.rows.length) {
       const id = existing.rows[0].id;
 
       // Update the existing highlight
-      result = await db.query(
+      result = await pool.query(
         "UPDATE academic_highlights SET title=$1, description=$2, created_at=NOW() WHERE id=$3 RETURNING *",
         [title, description, id]
       );
     } else {
       // Insert new highlight if none exists
-      result = await db.query(
+      result = await pool.query(
         "INSERT INTO academic_highlights(title, description) VALUES($1,$2) RETURNING *",
         [title, description]
       );
@@ -228,7 +230,7 @@ app.post("/academic-highlights", async (req, res) => {
 // Get the latest highlight
 app.get("/academic-highlights", async (_, res) => {
   try {
-    const result = await db.query(
+    const result = await pool.query(
       "SELECT * FROM academic_highlights ORDER BY created_at DESC LIMIT 1"
     );
     res.json(result.rows);
@@ -255,7 +257,7 @@ app.post("/events", uploadEventImage.single("image"), async (req, res) => {
   try {
     const { title, description, date } = req.body;
     const image_url = req.file ? `/uploads/${req.file.filename}` : null;
-    const result = await db.query(
+    const result = await pool.query(
       "INSERT INTO events(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
       [title, description, date, image_url]
     );
@@ -269,7 +271,7 @@ app.post("/events", uploadEventImage.single("image"), async (req, res) => {
 // Get all events
 app.get("/events", async (_, res) => {
   try {
-    const result = await db.query("SELECT * FROM events ORDER BY date ASC");
+    const result = await pool.query("SELECT * FROM events ORDER BY date ASC");
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -287,14 +289,14 @@ app.put("/events/:id", uploadEventImage.single("image"), async (req, res) => {
 
     // delete old image if new image uploaded
     if (image_url) {
-      const old = await db.query("SELECT image_url FROM events WHERE id=$1", [id]);
+      const old = await pool.query("SELECT image_url FROM events WHERE id=$1", [id]);
       if (old.rows.length && old.rows[0].image_url) {
         const oldPath = path.join("uploads", path.basename(old.rows[0].image_url));
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
     }
 
-    const result = await db.query(
+    const result = await pool.query(
       `UPDATE events
        SET title=$1, description=$2, date=$3, image_url=COALESCE($4, image_url)
        WHERE id=$5 RETURNING *`,
@@ -311,12 +313,12 @@ app.put("/events/:id", uploadEventImage.single("image"), async (req, res) => {
 app.delete("/events/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const data = await db.query("SELECT image_url FROM events WHERE id=$1", [id]);
+    const data = await pool.query("SELECT image_url FROM events WHERE id=$1", [id]);
     if (data.rows.length && data.rows[0].image_url) {
       const imgPath = path.join("uploads", path.basename(data.rows[0].image_url));
       if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
     }
-    await db.query("DELETE FROM events WHERE id=$1", [id]);
+    await pool.query("DELETE FROM events WHERE id=$1", [id]);
     res.json({ message: "Event deleted ✅" });
   } catch (err) {
     console.error(err);
@@ -336,7 +338,7 @@ app.put("/notes/:id", uploadPDF.single("file"), async (req, res) => {
     file_url = `/uploads/${req.file.filename}`;
 
     // delete old file
-    const old = await db.query(
+    const old = await pool.query(
       "SELECT file_url FROM notes WHERE id=$1",
       [id]
     );
@@ -346,7 +348,7 @@ app.put("/notes/:id", uploadPDF.single("file"), async (req, res) => {
     }
   }
 
-  const result = await db.query(
+  const result = await pool.query(
     `UPDATE notes 
      SET title=$1, semester=$2, subject=$3, 
      file_url=COALESCE($4, file_url)
@@ -365,7 +367,7 @@ app.put("/papers/:id", uploadPDF.single("file"), async (req, res) => {
   if (req.file) {
     file_url = `/uploads/${req.file.filename}`;
 
-    const old = await db.query(
+    const old = await pool.query(
       "SELECT file_url FROM question_papers WHERE id=$1",
       [id]
     );
@@ -375,7 +377,7 @@ app.put("/papers/:id", uploadPDF.single("file"), async (req, res) => {
     }
   }
 
-  const result = await db.query(
+  const result = await pool.query(
     `UPDATE question_papers 
      SET title=$1, semester=$2, subject=$3,
      file_url=COALESCE($4, file_url)
@@ -391,7 +393,7 @@ app.post("/notes", uploadPDF.single("file"), async (req, res) => {
   const { title, semester, subject } = req.body;
   const file_url = `/uploads/${req.file.filename}`;
 
-  const result = await db.query(
+  const result = await pool.query(
     "INSERT INTO notes(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
     [title, semester, subject, file_url]
   );
@@ -399,7 +401,7 @@ app.post("/notes", uploadPDF.single("file"), async (req, res) => {
 });
 
 app.get("/notes", async (_, res) => {
-  const result = await db.query(
+  const result = await pool.query(
     "SELECT * FROM notes ORDER BY created_at DESC"
   );
   res.json(result.rows);
@@ -408,7 +410,7 @@ app.get("/notes", async (_, res) => {
 app.delete("/notes/:id", async (req, res) => {
   const { id } = req.params;
 
-  const data = await db.query(
+  const data = await pool.query(
     "SELECT file_url FROM notes WHERE id=$1",
     [id]
   );
@@ -418,12 +420,12 @@ app.delete("/notes/:id", async (req, res) => {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
 
-  await db.query("DELETE FROM notes WHERE id=$1", [id]);
+  await pool.query("DELETE FROM notes WHERE id=$1", [id]);
   res.json({ message: "Note deleted ✅" });
 });app.delete("/papers/:id", async (req, res) => {
   const { id } = req.params;
 
-  const data = await db.query(
+  const data = await pool.query(
     "SELECT file_url FROM question_papers WHERE id=$1",
     [id]
   );
@@ -433,7 +435,7 @@ app.delete("/notes/:id", async (req, res) => {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
 
-  await db.query("DELETE FROM question_papers WHERE id=$1", [id]);
+  await pool.query("DELETE FROM question_papers WHERE id=$1", [id]);
   res.json({ message: "Paper deleted ✅" });
 });
 
@@ -443,7 +445,7 @@ app.post("/papers", uploadPDF.single("file"), async (req, res) => {
   const { title, semester, subject } = req.body;
   const file_url = `/uploads/${req.file.filename}`;
 
-  const result = await db.query(
+  const result = await pool.query(
     "INSERT INTO question_papers(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
     [title, semester, subject, file_url]
   );
@@ -451,7 +453,7 @@ app.post("/papers", uploadPDF.single("file"), async (req, res) => {
 });
 
 app.get("/papers", async (_, res) => {
-  const result = await db.query("SELECT * FROM question_papers");
+  const result = await pool.query("SELECT * FROM question_papers");
   res.json(result.rows);
 });
 /* ================= SYLLABUS ================= */
@@ -462,7 +464,7 @@ app.post("/syllabus", uploadPDF.single("file"), async (req, res) => {
     const { title, semester, subject } = req.body;
     const file_url = `/uploads/${req.file.filename}`;
 
-    const result = await db.query(
+    const result = await pool.query(
       "INSERT INTO syllabus(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
       [title, semester, subject, file_url]
     );
@@ -475,7 +477,7 @@ app.post("/syllabus", uploadPDF.single("file"), async (req, res) => {
 
 // Get all syllabus
 app.get("/syllabus", async (_, res) => {
-  const result = await db.query(
+  const result = await pool.query(
     "SELECT * FROM syllabus ORDER BY semester"
   );
   res.json(result.rows);
@@ -485,7 +487,7 @@ app.get("/syllabus", async (_, res) => {
 app.delete("/syllabus/:id", async (req, res) => {
   const { id } = req.params;
 
-  const data = await db.query(
+  const data = await pool.query(
     "SELECT file_url FROM syllabus WHERE id=$1",
     [id]
   );
@@ -495,7 +497,7 @@ app.delete("/syllabus/:id", async (req, res) => {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
 
-  await db.query("DELETE FROM syllabus WHERE id=$1", [id]);
+  await pool.query("DELETE FROM syllabus WHERE id=$1", [id]);
   res.json({ message: "Syllabus deleted ✅" });
 });
 /* ================= EXAM TIMETABLE ================= */
@@ -513,7 +515,7 @@ app.post("/exam-timetable", uploadPDF.single("file"), async (req, res) => {
 
     const file_url = `/uploads/${req.file.filename}`;
 
-    const result = await db.query(
+    const result = await pool.query(
       "INSERT INTO exam_timetable(title, semester, file_url, uploaded_by) VALUES($1,$2,$3,$4) RETURNING *",
       [title, semester, file_url, uploaded_by || null]
     );
@@ -528,7 +530,7 @@ app.post("/exam-timetable", uploadPDF.single("file"), async (req, res) => {
 // Get all exam timetables
 app.get("/exam-timetable", async (_, res) => {
   try {
-    const result = await db.query(
+    const result = await pool.query(
       "SELECT * FROM exam_timetable ORDER BY created_at DESC"
     );
     res.json(result.rows);
@@ -543,13 +545,13 @@ app.delete("/exam-timetable/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const data = await db.query("SELECT file_url FROM exam_timetable WHERE id=$1", [id]);
+    const data = await pool.query("SELECT file_url FROM exam_timetable WHERE id=$1", [id]);
     if (data.rows.length) {
       const filePath = path.join("uploads", path.basename(data.rows[0].file_url));
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
 
-    await db.query("DELETE FROM exam_timetable WHERE id=$1", [id]);
+    await pool.query("DELETE FROM exam_timetable WHERE id=$1", [id]);
     res.json({ message: "Exam timetable deleted ✅" });
   } catch (err) {
     console.error(err);
@@ -567,7 +569,7 @@ app.get("/download/:type/:id", async (req, res) => {
     else if (type === "exam-timetable") table = "exam_timetable";
     else return res.status(400).json({ message: "Invalid type" });
 
-    const data = await db.query(`SELECT file_url, title FROM ${table} WHERE id=$1`, [id]);
+    const data = await pool.query(`SELECT file_url, title FROM ${table} WHERE id=$1`, [id]);
     if (!data.rows.length) return res.status(404).json({ message: "File not found" });
 
     const filePath = path.join("uploads", path.basename(data.rows[0].file_url));
@@ -587,7 +589,7 @@ app.post("/faculty", uploadImage.single("image"), async (req, res) => {
   const { name, designation, subject } = req.body;
   const image_url = req.file ? `/uploads/${req.file.filename}` : null;
 
-  const result = await db.query(
+  const result = await pool.query(
     "INSERT INTO faculty(name,designation,subject,image_url) VALUES($1,$2,$3,$4) RETURNING *",
     [name, designation, subject, image_url]
   );
@@ -595,7 +597,7 @@ app.post("/faculty", uploadImage.single("image"), async (req, res) => {
 });
 
 app.get("/faculty", async (_, res) => {
-  const result = await db.query(
+  const result = await pool.query(
     "SELECT * FROM faculty ORDER BY id DESC"
   );
   res.json(result.rows);
@@ -607,7 +609,7 @@ app.put("/faculty/:id", uploadImage.single("image"), async (req, res) => {
   const { name, designation, subject } = req.body;
   const image_url = req.file ? `/uploads/${req.file.filename}` : null;
 
-  const result = await db.query(
+  const result = await pool.query(
     "UPDATE faculty SET name=$1,designation=$2,subject=$3,image_url=COALESCE($4,image_url) WHERE id=$5 RETURNING *",
     [name, designation, subject, image_url, id]
   );
@@ -620,7 +622,7 @@ app.delete("/faculty/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
-    const { rows } = await db.query("SELECT * FROM faculty WHERE id=$1", [id]);
+    const { rows } = await pool.query("SELECT * FROM faculty WHERE id=$1", [id]);
     if (!rows.length) return res.status(404).json({ message: "Faculty not found" });
 
     const faculty = rows[0];
@@ -630,7 +632,7 @@ app.delete("/faculty/:id", async (req, res) => {
       if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
     }
 
-    await db.query("DELETE FROM faculty WHERE id=$1", [id]);
+    await pool.query("DELETE FROM faculty WHERE id=$1", [id]);
     res.json({ message: "Faculty deleted ✅", deletedId: id });
   } catch (err) {
     console.error("Delete faculty error:", err);
@@ -643,7 +645,7 @@ app.post("/students-rep", uploadImage.single("image"), async (req, res) => {
     const { name, email, class: className } = req.body;
     const image_url = req.file ? `/uploads/${req.file.filename}` : null;
 
-    const result = await db.query(
+    const result = await pool.query(
       "INSERT INTO student_representatives(name,email,class,image_url) VALUES($1,$2,$3,$4) RETURNING *",
       [name, email, className, image_url]
     );
@@ -657,7 +659,7 @@ app.post("/students-rep", uploadImage.single("image"), async (req, res) => {
 
 app.get("/students-rep", async (_, res) => {
   try {
-    const result = await db.query("SELECT * FROM student_representatives ORDER BY created_at DESC");
+    const result = await pool.query("SELECT * FROM student_representatives ORDER BY created_at DESC");
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -672,7 +674,7 @@ app.put("/students-rep/:id", uploadImage.single("image"), async (req, res) => {
     const { name, email, class: className } = req.body;
     const image_url = req.file ? `/uploads/${req.file.filename}` : null;
 
-    const result = await db.query(
+    const result = await pool.query(
       `UPDATE student_representatives 
        SET name=$1, email=$2, class=$3, image_url=COALESCE($4, image_url)
        WHERE id=$5 RETURNING *`,
@@ -691,7 +693,7 @@ app.delete("/students-rep/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
-    const { rows } = await db.query("SELECT image_url FROM student_representatives WHERE id=$1", [id]);
+    const { rows } = await pool.query("SELECT image_url FROM student_representatives WHERE id=$1", [id]);
     if (!rows.length) return res.status(404).json({ message: "Student not found" });
 
     const imgUrl = rows[0].image_url;
@@ -700,7 +702,7 @@ app.delete("/students-rep/:id", async (req, res) => {
       if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
     }
 
-    await db.query("DELETE FROM student_representatives WHERE id=$1", [id]);
+    await pool.query("DELETE FROM student_representatives WHERE id=$1", [id]);
     res.json({ message: "Student deleted ✅" });
   } catch (err) {
     console.error("Delete student error:", err);
@@ -723,7 +725,7 @@ const uploadInternship = multer({
 // Get all internships
 app.get("/internships", async (req, res) => {
   try {
-    const result = await db.query(
+    const result = await pool.query(
       "SELECT id, name, roll_no, class, company, certificate_url, created_at FROM internships ORDER BY created_at DESC"
     );
     res.json(result.rows);
@@ -743,7 +745,7 @@ app.post("/internships", uploadInternship.single("certificate"), async (req, res
     const { name, roll_no, class: className, company } = req.body;
     let certificate_url = req.file ? `/uploads/internships/${req.file.filename}` : null;
 
-    const result = await db.query(
+    const result = await pool.query(
       "INSERT INTO internships(name, roll_no, class, company, certificate_url) VALUES($1,$2,$3,$4,$5) RETURNING *",
       [name, roll_no, className, company, certificate_url]
     );
@@ -759,7 +761,7 @@ app.post("/internships", uploadInternship.single("certificate"), async (req, res
 app.get("/internships/:id/certificate", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       "SELECT certificate_url FROM internships WHERE id=$1",
       [id]
     );
@@ -783,7 +785,7 @@ app.get("/internships/:id/certificate", async (req, res) => {
 app.delete("/internships/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { rows } = await db.query("SELECT certificate_url FROM internships WHERE id=$1", [id]);
+    const { rows } = await pool.query("SELECT certificate_url FROM internships WHERE id=$1", [id]);
     if (!rows.length) return res.status(404).json({ message: "Internship not found" });
 
     // delete file
@@ -792,7 +794,7 @@ app.delete("/internships/:id", async (req, res) => {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
 
-    await db.query("DELETE FROM internships WHERE id=$1", [id]);
+    await pool.query("DELETE FROM internships WHERE id=$1", [id]);
     res.json({ message: "Internship deleted ✅" });
   } catch (err) {
     console.error(err);
@@ -807,7 +809,7 @@ app.delete("/internships/:id", async (req, res) => {
 // Get all clubs
 app.get("/clubs", async (_, res) => {
   try {
-    const result = await db.query("SELECT * FROM clubs ORDER BY created_at DESC");
+    const result = await pool.query("SELECT * FROM clubs ORDER BY created_at DESC");
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -820,7 +822,7 @@ app.get("/clubs", async (_, res) => {
 app.post("/clubs", async (req, res) => {
   try {
     const { name, description } = req.body; // removed created_by
-    const result = await db.query(
+    const result = await pool.query(
       "INSERT INTO clubs(name, description) VALUES($1,$2) RETURNING *",
       [name, description]
     );
@@ -836,7 +838,7 @@ app.post("/clubs", async (req, res) => {
 app.delete("/clubs/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    await db.query("DELETE FROM clubs WHERE id=$1", [id]);
+    await pool.query("DELETE FROM clubs WHERE id=$1", [id]);
     res.json({ message: "Club deleted ✅" });
   } catch (err) {
     console.error(err);
@@ -848,7 +850,7 @@ app.delete("/clubs/:id", async (req, res) => {
 app.get("/clubs/:id/members", async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await db.query(
+    const result = await pool.query(
       "SELECT * FROM club_members WHERE club_id=$1 ORDER BY joined_at DESC",
       [id]
     );
@@ -865,7 +867,7 @@ app.post("/clubs/:id/join", async (req, res) => {
     const { id } = req.params;
     const { name, roll_no, class: className, email } = req.body;
 
-    const result = await db.query(
+    const result = await pool.query(
       "INSERT INTO club_members(club_id, name, roll_no, class, email) VALUES($1,$2,$3,$4,$5) RETURNING *",
       [id, name, roll_no, className, email]
     );
@@ -905,7 +907,7 @@ const uploadActivityImage = multer({
 // ================= GET ACTIVITIES =================
 app.get("/api/activities", async (_, res) => {
   try {
-    const result = await db.query(
+    const result = await pool.query(
       "SELECT * FROM department_activities ORDER BY event_date DESC"
     );
     res.json(result.rows);
@@ -925,7 +927,7 @@ app.post(
       const { title, category, description, event_date } = req.body;
       const image_url = req.file ? `/uploads/${req.file.filename}` : null;
 
-      const result = await db.query(
+      const result = await pool.query(
         `INSERT INTO department_activities
          (title, category, description, image_url, event_date)
          VALUES ($1,$2,$3,$4,$5)
@@ -957,7 +959,7 @@ app.put(
       if (req.file) {
         image_url = `/uploads/${req.file.filename}`;
 
-        const old = await db.query(
+        const old = await pool.query(
           "SELECT image_url FROM department_activities WHERE id=$1",
           [id]
         );
@@ -972,7 +974,7 @@ app.put(
         }
       }
 
-      const result = await db.query(
+      const result = await pool.query(
         `UPDATE department_activities
          SET title=$1,
              category=$2,
@@ -998,7 +1000,7 @@ app.delete("/api/activities/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await db.query(
+    const result = await pool.query(
       "SELECT image_url FROM department_activities WHERE id=$1",
       [id]
     );
@@ -1012,7 +1014,7 @@ app.delete("/api/activities/:id", async (req, res) => {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
 
-    await db.query("DELETE FROM department_activities WHERE id=$1", [id]);
+    await pool.query("DELETE FROM department_activities WHERE id=$1", [id]);
 
     res.json({ message: "Deleted successfully" });
   } catch (err) {
@@ -1025,10 +1027,10 @@ app.delete("/api/activities/:id", async (req, res) => {
 // ================= HEALTH =================
 app.get("/health", async (_, res) => {
   try {
-    await db.query("SELECT 1");
-    res.json({ status: "OK", db: "Connected" });
+    await pool.query("SELECT 1");
+    res.json({ status: "OK", pool: "Connected" });
   } catch {
-    res.status(500).json({ status: "DB Error" });
+    res.status(500).json({ status: "pool Error" });
   }
 });
 
