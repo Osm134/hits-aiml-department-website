@@ -1,15 +1,14 @@
 {
-  "name": "server",
+  "name": "hits-aiml-department-server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Backend for HITSAIML Department Website",
+  "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "Jangeti Srikanth",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.3",
