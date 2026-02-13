@@ -18,8 +18,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ================= MIDDLEWARE ================= */
+const allowedOrigin = process.env.REACT_APP_ALLOWED_ORIGIN; 
 
-app.use(cors({}));
+app.use(cors({
+  origin: allowedOrigin,
+  credentials: true
+}));
 
 app.use(express.json());
 // Serve files from uploads folder
