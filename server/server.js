@@ -10,7 +10,9 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { dirname } from "path"; 
 dotenv.config();
-const port = 5000;
+
+const port = process.env.PORT || 5000;
+
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
