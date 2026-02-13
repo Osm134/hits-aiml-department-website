@@ -31,13 +31,10 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* ================= DATABASE ================= */
 const pool = new pg.Pool({
-
-  user: process.env.PG_USER,
-  host: process.env.PG_HOST,
-  database: process.env.PG_DATABASE,
-  password:  String(process.env.PG_PASSWORD),
-  port: Number(process.env.PG_PORT),
-
+  connectionString: process.env.DATABASE_URL, // Render PostgreSQL URL
+  ssl: {
+    rejectUnauthorized: false, // Required for Render
+  },
 });
 
 pool.connect()
