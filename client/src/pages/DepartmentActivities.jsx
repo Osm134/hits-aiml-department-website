@@ -22,7 +22,7 @@ export default function DepartmentActivities() {
   // Fetch activities from backend
   const fetchActivities = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/activities");
+      const res = await axios.get("https://hits-aiml-department-website.onrender.com/api/activities");
       setActivities(res.data);
     } catch (err) {
       console.error(err);

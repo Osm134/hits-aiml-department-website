@@ -1,6 +1,6 @@
 export default function StudentRepCard({ student, onEdit, onDelete }) {
   const imageSrc = student.image_url
-    ? `http://localhost:5000${student.image_url}`
+    ? `https://hits-aiml-department-website.onrender.com${student.image_url}`
     : "/user-placeholder.png"; // fallback
 
   return (

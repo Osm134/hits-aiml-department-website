@@ -3,7 +3,7 @@ import axios from "axios";
 export default function EventCard({ event, refresh }) {
   const deleteEvent = async () => {
     if (!window.confirm("Are you sure you want to delete this activity?")) return;
-    await axios.delete(`http://localhost:5000/api/activities/${event.id}`);
+    await axios.delete(`https://hits-aiml-department-website.onrender.com/api/activities/${event.id}`);
     refresh();
   };
 
@@ -14,7 +14,7 @@ export default function EventCard({ event, refresh }) {
       {event.image_url && (
         <div className="relative w-full">
           <img
-            src={`http://localhost:5000${event.image_url}`}
+            src={`https://hits-aiml-department-website.onrender.com${event.image_url}`}
             alt={event.title}
             className="w-full h-auto object-contain object-center transition-transform duration-300 hover:scale-105"
           />

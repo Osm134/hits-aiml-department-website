@@ -17,7 +17,7 @@ export default function StudentRepModal({ isOpen, onClose, studentData, refresh 
       setEmail(studentData.email || "");
       setClassName(studentData.class || "");
       setImage(null);
-      setPreview(studentData.image_url ? `http://localhost:5000${studentData.image_url}` : null);
+      setPreview(studentData.image_url ? `https://hits-aiml-department-website.onrender.com${studentData.image_url}` : null);
     } else {
       setName("");
       setEmail("");

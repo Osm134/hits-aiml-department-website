@@ -12,7 +12,7 @@ export default function FacultyCard({ faculty, onEdit, onDelete }) {
         <img
           src={
             faculty.image_url
-              ? `http://localhost:5000${faculty.image_url}`
+              ? `https://hits-aiml-department-website.onrender.com${faculty.image_url}`
               : "/faculty.jpg"
           }
           alt={faculty.name}

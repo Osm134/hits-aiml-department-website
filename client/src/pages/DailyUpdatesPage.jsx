@@ -10,7 +10,7 @@ export default function DailyUpdatesPage() {
   // Fetch updates from backend
   const fetchUpdates = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/updates");
+      const res = await axios.get("https://hits-aiml-department-website.onrender.com/updates");
       setUpdates(res.data);
     } catch (err) {
       console.error("Failed to fetch updates:", err);
@@ -36,7 +36,7 @@ export default function DailyUpdatesPage() {
   // Save changes
   const handleSave = async (id) => {
     try {
-      const res = await axios.put(`http://localhost:5000/updates/${id}`, editData);
+      const res = await axios.put(`https://hits-aiml-department-website.onrender.com/updates/${id}`, editData);
       setUpdates(updates.map(u => u.id === id ? res.data : u));
       setEditingId(null);
     } catch (err) {
@@ -48,7 +48,7 @@ export default function DailyUpdatesPage() {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this update?")) return;
     try {
-      await axios.delete(`http://localhost:5000/updates/${id}`);
+      await axios.delete(`https://hits-aiml-department-website.onrender.com/updates/${id}`);
       setUpdates(updates.filter(u => u.id !== id));
     } catch (err) {
       console.error("Failed to delete update:", err);
@@ -59,7 +59,7 @@ export default function DailyUpdatesPage() {
   const handleAdd = async () => {
     if (!newUpdate.title || !newUpdate.description) return alert("Please fill all fields");
     try {
-      const res = await axios.post("http://localhost:5000/updates", newUpdate);
+      const res = await axios.post("https://hits-aiml-department-website.onrender.com/updates", newUpdate);
       setUpdates([res.data, ...updates]);
       setNewUpdate({ title: "", description: "" });
     } catch (err) {

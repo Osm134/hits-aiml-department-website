@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-const API = axios.create({ baseURL: "http://localhost:5000" });
+const API = axios.create({ baseURL: "https://hits-aiml-department-website.vercel.app/" });
 
 /* ================= CREATE CLUB MODAL ================= */
 function CreateClubModal({ isOpen, onClose, onCreated }) {

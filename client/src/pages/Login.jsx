@@ -20,7 +20,7 @@ export default function Login() {
   useEffect(() => {
     const checkAdmin = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/admin-exists");
+        const res = await axios.get("https://hits-aiml-department-website.onrender.com/admin-exists");
         if (!res.data.exists) {
           setFirstAdmin(true);
           setForm(prev => ({ ...prev, role: "ADMIN" }));
@@ -51,10 +51,10 @@ export default function Login() {
           payload.creatorId = Number(localStorage.getItem("userId"));
         }
 
-        await axios.post("http://localhost:5000/register", payload);
+        await axios.post("https://hits-aiml-department-website.onrender.com/register", payload);
 
         // Auto-login after registration
-        const res = await axios.post("http://localhost:5000/login", {
+        const res = await axios.post("https://hits-aiml-department-website.onrender.com/login", {
           email: form.email,
           password: form.password,
         });
@@ -69,7 +69,7 @@ export default function Login() {
 
       } else {
         // LOGIN
-        const res = await axios.post("http://localhost:5000/login", {
+        const res = await axios.post("https://hits-aiml-department-website.onrender.com/login", {
           email: form.email,
           password: form.password,
         });

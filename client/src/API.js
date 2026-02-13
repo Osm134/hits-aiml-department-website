@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000",
+  baseURL: "https://hits-aiml-department-website.vercel.app/",
 });
 
 export default API;

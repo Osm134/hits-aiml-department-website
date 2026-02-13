@@ -18,7 +18,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ================= MIDDLEWARE ================= */
-app.use(cors());
+
+app.use(cors({
+  origin: 'https://hits-aiml-department-website.vercel.app/'
+}));
+
 app.use(express.json());
 // Serve files from uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

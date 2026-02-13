@@ -17,7 +17,7 @@ export default function EventForm({ onClose }) {
     Object.entries(form).forEach(([k, v]) => data.append(k, v));
     if (image) data.append("image", image);
 
-    await axios.post("http://localhost:5000/api/activities", data);
+    await axios.post("https://hits-aiml-department-website.vercel.app/api/activities", data);
 
     onClose(); // Close modal after submitting
   };

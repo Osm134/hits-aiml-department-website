@@ -33,9 +33,9 @@ export default function Home() {
   const navigate = useNavigate();
 
   /* -------------------- DATA HOOKS -------------------- */
-  const { data: updates, loading: loadingUpdates } = useFetch("http://localhost:5000/updates", 3);
-  const { data: events, refetch: refetchEvents } = useFetch("http://localhost:5000/events");
-  const { data: facultyList, loading: loadingFaculty } = useFetch("http://localhost:5000/faculty");
+  const { data: updates, loading: loadingUpdates } = useFetch("https://hits-aiml-department-website.onrender.com/updates", 3);
+  const { data: events, refetch: refetchEvents } = useFetch("https://hits-aiml-department-website.onrender.com/events");
+  const { data: facultyList, loading: loadingFaculty } = useFetch("https://hits-aiml-department-website.onrender.com/faculty");
 
   /* -------------------- HIGHLIGHT STATE -------------------- */
   const [highlight, setHighlight] = useState(null);
@@ -56,7 +56,7 @@ export default function Home() {
   useEffect(() => {
     const fetchHighlight = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/academic-highlights");
+        const res = await axios.get("https://hits-aiml-department-website.onrender.com/academic-highlights");
         if (res.data.length) setHighlight(res.data[0]);
       } catch (err) {
         console.error("Failed to fetch academic highlight:", err);
@@ -111,11 +111,11 @@ export default function Home() {
 
     try {
       if (editingEvent) {
-        await axios.put(`http://localhost:5000/events/${editingEvent.id}`, formData, {
+        await axios.put(`https://hits-aiml-department-website.onrender.com/events/${editingEvent.id}`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       } else {
-        await axios.post("http://localhost:5000/events", formData, {
+        await axios.post("https://hits-aiml-department-website.onrender.com/events", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       }
@@ -130,7 +130,7 @@ export default function Home() {
   const deleteEvent = async (id) => {
     if (!window.confirm("Are you sure you want to delete this event?")) return;
     try {
-      await axios.delete(`http://localhost:5000/events/${id}`);
+      await axios.delete(`https://hits-aiml-department-website.onrender.com/events/${id}`);
       refetchEvents();
     } catch (err) {
       console.error("Failed to delete event:", err);
@@ -150,11 +150,11 @@ export default function Home() {
   const saveHighlight = async () => {
     if (!highlightTitle.trim() || !highlightDesc.trim()) return alert("Please enter both title and description!");
     try {
-      await axios.post("http://localhost:5000/academic-highlights", {
+      await axios.post("https://hits-aiml-department-website.onrender.com/academic-highlights", {
         title: highlightTitle,
         description: highlightDesc,
       });
-      const res = await axios.get("http://localhost:5000/academic-highlights");
+      const res = await axios.get("https://hits-aiml-department-website.onrender.com/academic-highlights");
       setHighlight(res.data[0]);
       setModalOpen(false);
     } catch (err) {
@@ -233,7 +233,7 @@ export default function Home() {
                     <h3 className="font-semibold text-gray-800 text-base">{u.title}</h3>
                     <p className="text-gray-700 text-sm line-clamp-2">{u.description}</p>
                     {u.file_url && (
-                      <a href={`http://localhost:5000${u.file_url}`} download className="absolute top-0 right-0 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                      <a href={`https://hits-aiml-department-website.onrender.com${u.file_url}`} download className="absolute top-0 right-0 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
                         <Download className="w-3 h-3" /> Download
                       </a>
                     )}
@@ -281,7 +281,7 @@ export default function Home() {
           <div className="mt-4 relative flex flex-col items-center w-full">
             <div className="w-full max-w-3xl bg-gray-50 rounded-2xl shadow-lg transition transform hover:scale-105 overflow-hidden flex flex-col animate-slide-in">
               <div className="w-full overflow-hidden rounded-t-2xl">
-                <img src={events[activeEvent].image_url ? `http://localhost:5000${events[activeEvent].image_url}` : "/placeholder.jpg"} alt={events[activeEvent].title} className="w-full h-auto object-contain" />
+                <img src={events[activeEvent].image_url ? `https://hits-aiml-department-website.onrender.com${events[activeEvent].image_url}` : "/placeholder.jpg"} alt={events[activeEvent].title} className="w-full h-auto object-contain" />
               </div>
               <div className="p-4 flex flex-col gap-2">
                 <h3 className="font-semibold text-gray-800 text-xl">{events[activeEvent].title}</h3>
@@ -289,7 +289,7 @@ export default function Home() {
                 <p className="text-gray-700 text-sm">{events[activeEvent].description}</p>
                 <div className="flex justify-between items-center mt-3">
                   {events[activeEvent].file_url && (
-                    <a href={`http://localhost:5000${events[activeEvent].file_url}`} download className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1">
+                    <a href={`https://hits-aiml-department-website.onrender.com${events[activeEvent].file_url}`} download className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1">
                       <Download className="w-3 h-3" /> Download
                     </a>
                   )}
@@ -383,7 +383,7 @@ export default function Home() {
             <div className="flex space-x-6 overflow-x-auto py-2">
               {facultyList.map(f => (
                 <div key={f.id} className="min-w-[200px] bg-white rounded-3xl shadow-xl overflow-hidden transform hover:scale-105 transition duration-300">
-                  <img src={f.image_url ? `http://localhost:5000${f.image_url}` : "/faculty.jpg"} alt={f.name} className="w-full h-48 object-cover" />
+                  <img src={f.image_url ? `https://hits-aiml-department-website.onrender.com${f.image_url}` : "/faculty.jpg"} alt={f.name} className="w-full h-48 object-cover" />
                   <div className="bg-[#0B3C78] text-white py-2 text-center">
                     <h3 className="font-semibold text-md">{f.name}</h3>
                     <p className="text-sm">{f.designation}</p>

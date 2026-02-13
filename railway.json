@@ -1,9 +1,0 @@
-{
-  "build": {
-    "builder": "node",
-    "start": "server/server.js"
-  },
-  "install": {
-    "root": "server"
-  }
-}
