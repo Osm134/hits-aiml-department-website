@@ -19,9 +19,7 @@ const __dirname = path.dirname(__filename);
 
 /* ================= MIDDLEWARE ================= */
 
-app.use(cors({
-  origin: 'https://hits-aiml-department-website.vercel.app/'
-}));
+app.use(cors({}));
 
 app.use(express.json());
 // Serve files from uploads folder
@@ -598,6 +596,7 @@ app.get("/faculty", async (_, res) => {
   );
   res.json(result.rows);
 });
+
 
 app.put("/faculty/:id", uploadImage.single("image"), async (req, res) => {
   const { id } = req.params;

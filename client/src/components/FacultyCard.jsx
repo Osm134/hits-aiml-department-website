@@ -12,7 +12,7 @@ export default function FacultyCard({ faculty, onEdit, onDelete }) {
         <img
           src={
             faculty.image_url
-              ? `https://hits-aiml-department-website.onrender.com${faculty.image_url}`
+              ? `${process.env.REACT_APP_API_URL}${faculty.image_url}`
               : "/faculty.jpg"
           }
           alt={faculty.name}

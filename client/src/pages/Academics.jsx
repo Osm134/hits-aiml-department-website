@@ -17,6 +17,9 @@ export default function Academics() {
   const [uploadSem, setUploadSem] = useState(null);
   const fileInputRef = useRef(null);
 
+    const API = process.env.REACT_APP_API_URL; // <-- Use env variable
+
+
   /* ================= FETCH ================= */
   const fetchData = useCallback(async () => {
     try {
@@ -29,7 +32,7 @@ export default function Academics() {
           ? "exam-timetable"
           : "syllabus";
 
-      const res = await fetch(`https://hits-aiml-department-website.onrender.com/${endpoint}`);
+      const res = await fetch(`${API}/${endpoint}`);
       if (!res.ok) throw new Error("Fetch failed");
       setData(await res.json());
     } catch (err) {
@@ -56,7 +59,7 @@ export default function Academics() {
         : "syllabus";
 
     try {
-      await fetch(`https://hits-aiml-department-website.onrender.com/${endpoint}/${id}`, {
+      await fetch(`${API}/${endpoint}/${id}`, {
         method: "DELETE",
       });
       fetchData();
@@ -94,7 +97,7 @@ export default function Academics() {
         : "syllabus";
 
     try {
-      const res = await fetch(`https://hits-aiml-department-website.onrender.com/${endpoint}`, {
+      const res = await fetch(`${API}/${endpoint}`, {
         method: "POST",
         body: formData,
       });
@@ -183,13 +186,13 @@ export default function Academics() {
                           {item.file_url && (
                             <>
                               <a
-                                href={`https://hits-aiml-department-website.onrender.com/download/${activeTab}/${item.id}`}
+                                href={`${API}/download/${activeTab}/${item.id}`}
                                 className="p-2 bg-green-600 text-white rounded"
                               >
                                 <FiDownload />
                               </a>
                               <a
-                                href={`https://hits-aiml-department-website.onrender.com${item.file_url}`}
+                                href={`${API}${item.file_url}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="p-2 bg-blue-600 text-white rounded"

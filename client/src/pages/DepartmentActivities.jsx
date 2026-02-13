@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import EventCard from "../components/EventCard";
 import ActivityModal from "../components/ActivityModal";
 
-// Categories for Department Activities
+// Categories
 const categories = [
   { name: "Events", path: "events" },
   { name: "Workshops", path: "workshops" },
@@ -16,26 +16,36 @@ const categories = [
 
 export default function DepartmentActivities() {
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);        // For Add Activity modal
-  const [activities, setActivities] = useState([]); // All activities
+  const { category } = useParams(); // <-- Get category from URL
+  const [open, setOpen] = useState(false);
+  const [activities, setActivities] = useState([]);
 
-  // Fetch activities from backend
+  const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const fetchActivities = async () => {
     try {
-      const res = await axios.get("https://hits-aiml-department-website.onrender.com/api/activities");
-      setActivities(res.data);
+      const res = await axios.get(`${BASE_URL}/api/activities`);
+      const allActivities = Array.isArray(res.data) ? res.data : [];
+
+      // Filter by category if present in URL
+      if (category) {
+        setActivities(allActivities.filter(a => a.category.toLowerCase() === category.toLowerCase()));
+      } else {
+        setActivities(allActivities);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Failed to fetch activities:", err);
+      setActivities([]);
     }
   };
 
   useEffect(() => {
     fetchActivities();
-  }, []);
+  }, [category]); // <-- refetch when category changes
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* HERO SECTION */}
+      {/* HERO */}
       <div className="bg-gradient-to-r from-blue-800 to-blue-600 text-white py-16 text-center">
         <h1 className="text-4xl md:text-5xl font-bold">Department Activities – AIML</h1>
         <p className="mt-2 text-lg md:text-xl">Explore • Learn • Innovate</p>
@@ -62,22 +72,23 @@ export default function DepartmentActivities() {
         ))}
       </div>
 
-      {/* RECENT ACTIVITIES GRID */}
+      {/* ACTIVITIES */}
       <div className="max-w-6xl mx-auto p-8">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">Recent Activities</h2>
+        <h2 className="text-2xl font-bold mb-6 text-gray-800">
+          {category ? `${category.charAt(0).toUpperCase() + category.slice(1)} Activities` : "Recent Activities"}
+        </h2>
 
         {activities.length === 0 ? (
           <p className="text-gray-500 text-center">No activities yet. Add one above!</p>
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
             {activities.map((event) => (
-              <EventCard key={event.id} event={event} refresh={fetchActivities} />
+              <EventCard key={event.id} event={event} refresh={fetchActivities} BASE_URL={BASE_URL} />
             ))}
           </div>
         )}
       </div>
 
-      {/* MODAL FOR ADDING ACTIVITY */}
       <ActivityModal open={open} onClose={() => setOpen(false)} refresh={fetchActivities} />
     </div>
   );

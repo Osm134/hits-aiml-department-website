@@ -13,6 +13,8 @@ export default function Login() {
     password: "",
     role: "STUDENT",
   });
+  const API = process.env.REACT_APP_API_URL;
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,7 +22,7 @@ export default function Login() {
   useEffect(() => {
     const checkAdmin = async () => {
       try {
-        const res = await axios.get("https://hits-aiml-department-website.onrender.com/admin-exists");
+       const res = await axios.get(`${API}/admin-exists`);
         if (!res.data.exists) {
           setFirstAdmin(true);
           setForm(prev => ({ ...prev, role: "ADMIN" }));
@@ -51,10 +53,10 @@ export default function Login() {
           payload.creatorId = Number(localStorage.getItem("userId"));
         }
 
-        await axios.post("https://hits-aiml-department-website.onrender.com/register", payload);
+          await axios.post(`${API}/register`, payload);
 
         // Auto-login after registration
-        const res = await axios.post("https://hits-aiml-department-website.onrender.com/login", {
+        const res = await axios.post(`${API}/login`, {
           email: form.email,
           password: form.password,
         });
@@ -69,10 +71,11 @@ export default function Login() {
 
       } else {
         // LOGIN
-        const res = await axios.post("https://hits-aiml-department-website.onrender.com/login", {
-          email: form.email,
-          password: form.password,
-        });
+        // LOGIN
+const res = await axios.post(`${API}/login`, {
+  email: form.email,
+  password: form.password,
+});
 
         localStorage.setItem("token", res.data.token);
         localStorage.setItem("role", res.data.user.role);

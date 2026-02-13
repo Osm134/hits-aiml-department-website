@@ -1,16 +1,18 @@
 export default function StudentRepCard({ student, onEdit, onDelete }) {
-  const imageSrc = student.image_url
-    ? `https://hits-aiml-department-website.onrender.com${student.image_url}`
+ const imageSrc = student.image_url
+    ? `${process.env.REACT_APP_API_URL}${student.image_url}`
     : "/user-placeholder.png"; // fallback
 
   return (
     <div className="bg-white border rounded-lg shadow hover:shadow-lg transition p-6 flex flex-col items-center">
       <div className="w-44 h-44 mb-5 relative">
         <img
-          src={imageSrc}
-          alt={student.name}
-          className="w-full h-full object-cover rounded-full border-4 border-gray-200"
-        />
+  src={imageSrc}
+  alt={student.name}
+  onError={(e) => (e.currentTarget.src = "/user-placeholder.png")}
+  className="w-full h-full object-cover rounded-full border-4 border-gray-200"
+/>
+
       </div>
 
       <h2 className="text-lg font-semibold text-gray-800">{student.name}</h2>

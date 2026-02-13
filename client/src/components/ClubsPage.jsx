@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-const API = axios.create({ baseURL: "https://hits-aiml-department-website.vercel.app/" });
+// Use environment variable for backend URL
+const API = axios.create({ baseURL: process.env.REACT_APP_API_URL });
 
 /* ================= CREATE CLUB MODAL ================= */
 function CreateClubModal({ isOpen, onClose, onCreated }) {

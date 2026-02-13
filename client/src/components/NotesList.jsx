@@ -4,7 +4,7 @@ export default function NotesList({ notes }) {
       {notes.map((note, idx) => (
         <a
           key={idx}
-          href={note.file_url}
+          href={`${process.env.REACT_APP_API_URL}${note.file_url}`}
           target="_blank"
           rel="noreferrer"
           className="bg-white shadow-md rounded p-4 hover:shadow-lg transition flex flex-col justify-between"

@@ -5,7 +5,7 @@ import StudentRepCard from "../components/StudentRepCard";
 import StudentRepModal from "../components/StudentRepModal";
 import Internship from "../components/Internships";
 
-const API = "https://hits-aiml-department-website.vercel.app/";
+const API = process.env.REACT_APP_API_URL;
 
 export default function Students() {
   const [activeTab, setActiveTab] = useState("clubs");

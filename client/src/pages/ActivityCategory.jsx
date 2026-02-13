@@ -16,8 +16,10 @@ export default function ActivityCategory() {
   const { type } = useParams();
   const [events, setEvents] = useState([]);
 
+  const API = process.env.REACT_APP_API_URL;
+
   const fetch = async () => {
-    const res = await axios.get("https://hits-aiml-department-website.onrender.com/api/activities");
+    const res = await axios.get(`${API}/api/activities`);
     setEvents(res.data.filter((e) => e.category === mapCategory[type]));
   };
 

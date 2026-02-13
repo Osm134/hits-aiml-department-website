@@ -10,12 +10,14 @@ export default function Faculty() {
   const [editFaculty, setEditFaculty] = useState(null);
   const [error, setError] = useState("");
 
+  // Fetch faculty safely
   const fetchFaculty = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const res = await API.get("/faculty");
-      setFacultyList(res.data || []);
+      // Ensure we always set an array
+      setFacultyList(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Fetch faculty failed:", err);
       setError("Failed to load faculty list");
@@ -42,6 +44,7 @@ export default function Faculty() {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this faculty?")) return;
 
+    // Backup current list in case delete fails
     const backupList = [...facultyList];
     setFacultyList((prev) => prev.filter((f) => f.id !== id));
 
@@ -72,7 +75,7 @@ export default function Faculty() {
         <p className="text-center text-gray-500">Loading faculty...</p>
       ) : error ? (
         <p className="text-center text-red-600">{error}</p>
-      ) : facultyList.length === 0 ? (
+      ) : !Array.isArray(facultyList) || facultyList.length === 0 ? (
         <p className="text-center text-gray-500">No faculty available.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
