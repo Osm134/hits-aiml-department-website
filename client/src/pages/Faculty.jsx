@@ -10,13 +10,11 @@ export default function Faculty() {
   const [editFaculty, setEditFaculty] = useState(null);
   const [error, setError] = useState("");
 
-  // Fetch faculty safely
   const fetchFaculty = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const res = await API.get("/faculty");
-      // Ensure we always set an array
       setFacultyList(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Fetch faculty failed:", err);
@@ -44,64 +42,49 @@ export default function Faculty() {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this faculty?")) return;
 
-    // Backup current list in case delete fails
-    const backupList = [...facultyList];
+    const backup = [...facultyList];
     setFacultyList((prev) => prev.filter((f) => f.id !== id));
 
     try {
       await API.delete(`/faculty/${id}`);
     } catch (err) {
-      console.error("Delete failed:", err.response?.data || err.message);
-      alert("Failed to delete faculty. Restoring data.");
-      setFacultyList(backupList);
+      console.error(err);
+      alert("Delete failed. Restoring data.");
+      setFacultyList(backup);
     }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-5 gap-3">
         <h1 className="text-2xl sm:text-3xl font-bold">Faculty</h1>
         <button
           onClick={openAddModal}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition w-full sm:w-auto"
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
         >
           Add Faculty
         </button>
       </div>
 
-      {/* Content */}
       {loading ? (
         <p className="text-center text-gray-500">Loading faculty...</p>
       ) : error ? (
         <p className="text-center text-red-600">{error}</p>
-      ) : !Array.isArray(facultyList) || facultyList.length === 0 ? (
+      ) : !facultyList.length ? (
         <p className="text-center text-gray-500">No faculty available.</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
-          {facultyList.map((faculty) => (
-            <div
-              key={faculty.id}
-              className="
-                mx-auto 
-                w-full 
-                max-w-[340px] 
-                sm:max-w-full
-                scale-[0.95] 
-                sm:scale-100
-              "
-            >
-              <FacultyCard
-                faculty={faculty}
-                onEdit={() => openEditModal(faculty)}
-                onDelete={() => handleDelete(faculty.id)}
-              />
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {facultyList.map((f) => (
+            <FacultyCard
+              key={f.id}
+              faculty={f}
+              onEdit={() => openEditModal(f)}
+              onDelete={() => handleDelete(f.id)}
+            />
           ))}
         </div>
       )}
 
-      {/* Modal */}
       <FacultyModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}

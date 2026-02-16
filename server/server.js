@@ -1,5 +1,7 @@
 import express from "express";
 import pg from "pg";
+import { Pool } from "pg";
+
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cors from "cors";
@@ -18,9 +20,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ================= MIDDLEWARE ================= */
-const allowedOrigin = process.env.REACT_APP_ALLOWED_ORIGIN || "http://localhost:3000";
+const allowedOrigin = process.env.REACT_APP_ALLOWED_ORIGIN; 
 
-app.use(cors({}));
+app.use(cors({
+  origin: allowedOrigin,
+  credentials: true
+}));
 
 
 app.use(express.json());
@@ -28,12 +33,12 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* ================= DATABASE ================= */
-const pool = new pg.Pool({
-   user: process.env.PG_USER,
-  host: process.env.PG_HOST,
-  database: process.env.PG_DATABASE,
-  password: String(process.env.PG_PASSWORD), // ensure it’s a string
-  port: Number(process.env.PG_PORT), 
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, // your Render Postgres URL
+  ssl: { rejectUnauthorized: false }, // required for Render Postgres
+  max: 10, // max connections in the pool
+  idleTimeoutMillis: 30000, // close idle clients after 30s
+  connectionTimeoutMillis: 2000, // timeout for connecting
 });
 
 pool.connect()
