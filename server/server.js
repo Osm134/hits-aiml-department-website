@@ -18,12 +18,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ================= MIDDLEWARE ================= */
-const allowedOrigin = process.env.REACT_APP_ALLOWED_ORIGIN; 
+const allowedOrigin = process.env.REACT_APP_ALLOWED_ORIGIN || "http://localhost:3000";
 
-app.use(cors({
-  origin: allowedOrigin,
-  credentials: true
-}));
+app.use(cors({}));
+
 
 app.use(express.json());
 // Serve files from uploads folder
@@ -31,10 +29,11 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* ================= DATABASE ================= */
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL, // Render PostgreSQL URL
-  ssl: {
-    rejectUnauthorized: false, // Required for Render
-  },
+   user: process.env.PG_USER,
+  host: process.env.PG_HOST,
+  database: process.env.PG_DATABASE,
+  password: String(process.env.PG_PASSWORD), // ensure it’s a string
+  port: Number(process.env.PG_PORT), 
 });
 
 pool.connect()
