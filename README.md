@@ -1,3 +1,9 @@
+
+## 🔗 Project Links
+
+- 🌐 Live Demo: https://hits-aiml-department-website.vercel.app
+- 💻 GitHub Repository: https://github.com/Osm134/hits-aiml-department-website.git
+
 # AIML Department Management System
 
 A full-stack web application developed to manage and showcase the activities of the Artificial Intelligence & Machine Learning (AIML) department.  
