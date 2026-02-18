@@ -149,13 +149,3 @@ License
 This project is developed for educational and departmental use.
 
 
----
-
-### Next step (optional)
-If you want, I can:
-- Customize this README **exactly to your resume wording**
-- Add **screenshots section**
-- Make a **separate README for frontend & backend**
-- Rewrite it to match **top GitHub portfolio standards**
-
-Just tell me what you want next.
