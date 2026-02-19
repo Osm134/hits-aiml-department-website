@@ -110,28 +110,41 @@ app.post("/login", async (req, res) => {
 // ================= FACULTY MODULE =================
 
 // CREATE
+// ================= FACULTY MODULE =================
+
+// CREATE
 app.post("/faculty", uploadFacultyImage.single("image"), async (req, res) => {
   try {
     const { name, designation, subject, email } = req.body;
 
+    // 🔧 FIX HERE: use public_id instead of filename
     const image_url = req.file?.path || null;
-    const image_public_id = req.file?.filename || null;
+    const image_public_id = req.file?.public_id || null;
 
-    console.log("☁️ Uploaded to Cloudinary:", image_url);
+    console.log("☁️ Cloudinary Upload Success:", {
+      image_url,
+      image_public_id
+    });
 
     const result = await pool.query(
-      `INSERT INTO faculty(name,designation,subject,email,image_url,image_public_id)
-       VALUES($1,$2,$3,$4,$5,$6)
+      `INSERT INTO faculty
+       (name, designation, subject, email, image_url, image_public_id)
+       VALUES ($1,$2,$3,$4,$5,$6)
        RETURNING *`,
       [name, designation, subject, email, image_url, image_public_id]
     );
 
-    res.json(result.rows[0]);
+    res.status(201).json({
+      message: "Faculty added successfully ✅",
+      data: result.rows[0]
+    });
+
   } catch (err) {
-    console.error(err);
+    console.error("❌ Faculty create failed:", err);
     res.status(500).json({ message: "Failed to add faculty" });
   }
 });
+
 
 // READ
 app.get("/faculty", async (_, res) => {
@@ -147,6 +160,7 @@ app.get("/faculty", async (_, res) => {
 });
 
 // UPDATE
+// UPDATE
 app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => {
   try {
     const { id } = req.params;
@@ -161,14 +175,17 @@ app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => 
         [id]
       );
 
+      // 🔧 SAFE DELETE using correct public_id
       if (old.rows[0]?.image_public_id) {
         await cloudinary.uploader.destroy(old.rows[0].image_public_id);
         console.log("🗑️ Old Cloudinary image deleted");
       }
 
+      // 🔧 FIX HERE
       image_url = req.file.path;
-      image_public_id = req.file.filename;
-      console.log("☁️ Updated image uploaded:", image_url);
+      image_public_id = req.file.public_id;
+
+      console.log("☁️ New image uploaded:", image_url);
     }
 
     const result = await pool.query(
@@ -177,20 +194,26 @@ app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => 
         designation=$2,
         subject=$3,
         email=$4,
-        image_url=COALESCE($5,image_url),
-        image_public_id=COALESCE($6,image_public_id)
+        image_url=COALESCE($5, image_url),
+        image_public_id=COALESCE($6, image_public_id)
        WHERE id=$7
        RETURNING *`,
       [name, designation, subject, email, image_url, image_public_id, id]
     );
 
-    res.json(result.rows[0]);
+    res.json({
+      message: "Faculty updated successfully ✅",
+      data: result.rows[0]
+    });
+
   } catch (err) {
-    console.error(err);
+    console.error("❌ Faculty update failed:", err);
     res.status(500).json({ message: "Failed to update faculty" });
   }
 });
 
+
+// DELETE
 // DELETE
 app.delete("/faculty/:id", async (req, res) => {
   try {
@@ -208,12 +231,13 @@ app.delete("/faculty/:id", async (req, res) => {
 
     await pool.query("DELETE FROM faculty WHERE id=$1", [id]);
 
-    res.json({ message: "Faculty deleted ✅" });
+    res.json({ message: "Faculty deleted successfully ✅" });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Faculty delete failed:", err);
     res.status(500).json({ message: "Failed to delete faculty" });
   }
 });
+
 
 
 
