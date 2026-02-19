@@ -32,37 +32,36 @@ pool.connect()
   .catch((err) => console.error("❌ PostgreSQL Connection Error:", err));
 
 
-// Cloudinary config
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+
+
+
+
+
+
+
+
 
 // Multer storage
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: async (req, file) => ({
+  params: {
     folder: "academics",
-    resource_type: "auto", // works for pdf/images
-    public_id: `${Date.now()}-${file.originalname}`,
-  }),
+    resource_type: "auto",
+  },
 });
 
 const upload = multer({ storage });
 
-// ========== ROUTES ==========
+// ================= ROUTES =================
 
-// GET all academics (optional: filter by type or semester)
+// Get all academics
 app.get("/academics", async (req, res) => {
   try {
     const { type } = req.query;
     let query = "SELECT * FROM academics ORDER BY created_at DESC";
-    let params = [];
-    if (type) {
-      query = "SELECT * FROM academics WHERE type=$1 ORDER BY created_at DESC";
-      params = [type];
-    }
+    const params = type ? [type] : [];
+    if (type) query = "SELECT * FROM academics WHERE type=$1 ORDER BY created_at DESC";
+
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
@@ -71,7 +70,7 @@ app.get("/academics", async (req, res) => {
   }
 });
 
-// UPLOAD new academic file
+// Upload file
 app.post("/academics", upload.single("file"), async (req, res) => {
   try {
     const { title, semester, subject, type } = req.body;
@@ -82,7 +81,6 @@ app.post("/academics", upload.single("file"), async (req, res) => {
       "INSERT INTO academics(title, semester, subject, type, file_url) VALUES($1,$2,$3,$4,$5) RETURNING *",
       [title, semester, subject, type, file_url]
     );
-
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -90,19 +88,18 @@ app.post("/academics", upload.single("file"), async (req, res) => {
   }
 });
 
-// DELETE academic file
+// Delete file
 app.delete("/academics/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Get file public_id from URL
     const { rows } = await pool.query("SELECT file_url FROM academics WHERE id=$1", [id]);
     if (!rows.length) return res.status(404).json({ message: "Not found" });
 
-    const fileUrl = rows[0].file_url;
-    const publicId = fileUrl.match(/academics\/(.+)\./)[1]; // extract public_id from URL
+    // Delete from Cloudinary
+    const publicId = rows[0].file_url.match(/academics\/(.+)\./)[1];
     await cloudinary.uploader.destroy(`academics/${publicId}`, { resource_type: "auto" });
 
+    // Delete from DB
     await pool.query("DELETE FROM academics WHERE id=$1", [id]);
     res.json({ message: "Deleted ✅" });
   } catch (err) {
@@ -110,7 +107,11 @@ app.delete("/academics/:id", async (req, res) => {
     res.status(500).json({ message: "Delete failed" });
   }
 });
-  
+
+
+
+
+
 /* ================= DAILY UPDATES ================= */
 app.post("/updates", async (req, res) => {
   const { title, description, image_url } = req.body;

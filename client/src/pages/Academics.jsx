@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { FiDownload, FiTrash2, FiUpload, FiEye } from "react-icons/fi";
 
 const semesters = [2, 3, 4, 5, 6, 7, 8];
@@ -8,16 +8,15 @@ export default function Academics() {
   const [data, setData] = useState([]);
   const [activeType, setActiveType] = useState("notes");
   const [openSem, setOpenSem] = useState(2);
-  const [uploadSem, setUploadSem] = useState(null);
-  const fileInputRef = useRef(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadData, setUploadData] = useState({ title: "", subject: "", semester: 2, file: null });
 
   const API = process.env.REACT_APP_API_URL;
 
   const fetchData = async () => {
     try {
       const res = await fetch(`${API}/academics?type=${activeType}`);
-      const result = await res.json();
-      setData(result);
+      setData(await res.json());
     } catch (err) {
       console.error(err);
       alert("Failed to fetch data");
@@ -28,36 +27,32 @@ export default function Academics() {
     fetchData();
   }, [activeType]);
 
-  const startUpload = (semester) => {
-    const title = prompt("Enter Title");
-    const subject = prompt("Enter Subject");
-    if (!title || !subject) return;
-    setUploadSem({ semester, title, subject });
-    fileInputRef.current.click();
+  const openUploadModal = (sem) => {
+    setUploadData({ title: "", subject: "", semester: sem, file: null });
+    setShowUpload(true);
   };
 
-  const handleFileChange = async (e) => {
-    if (!e.target.files[0] || !uploadSem) return;
+  const handleFileChange = (e) => setUploadData({ ...uploadData, file: e.target.files[0] });
+
+  const handleUpload = async () => {
+    if (!uploadData.title || !uploadData.subject || !uploadData.file) {
+      return alert("All fields required");
+    }
     const formData = new FormData();
-    formData.append("title", uploadSem.title);
-    formData.append("subject", uploadSem.subject);
-    formData.append("semester", uploadSem.semester);
+    formData.append("title", uploadData.title);
+    formData.append("subject", uploadData.subject);
+    formData.append("semester", uploadData.semester);
     formData.append("type", activeType);
-    formData.append("file", e.target.files[0]);
+    formData.append("file", uploadData.file);
 
     try {
-      const res = await fetch(`${API}/academics`, {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error();
+      await fetch(`${API}/academics`, { method: "POST", body: formData });
+      setShowUpload(false);
       fetchData();
     } catch (err) {
       console.error(err);
       alert("Upload failed");
     }
-    setUploadSem(null);
-    e.target.value = "";
   };
 
   const handleDelete = async (id) => {
@@ -75,7 +70,7 @@ export default function Academics() {
     <div className="max-w-7xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6 text-center">HITS AIML Academics</h1>
 
-      {/* Type Tabs */}
+      {/* Tabs */}
       <div className="flex gap-3 justify-center mb-6">
         {types.map((t) => (
           <button
@@ -89,15 +84,6 @@ export default function Academics() {
           </button>
         ))}
       </div>
-
-      {/* File input */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        hidden
-        onChange={handleFileChange}
-        accept="application/pdf,image/*"
-      />
 
       {/* Semesters */}
       {semesters.map((sem) => {
@@ -115,7 +101,7 @@ export default function Academics() {
               <div className="p-6">
                 <div className="mb-4 flex justify-end">
                   <button
-                    onClick={() => startUpload(sem)}
+                    onClick={() => openUploadModal(sem)}
                     className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded"
                   >
                     <FiUpload /> Upload
@@ -150,6 +136,38 @@ export default function Academics() {
           </div>
         );
       })}
+
+      {/* Upload Modal */}
+      {showUpload && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h2 className="text-xl font-bold mb-4">Upload File</h2>
+            <input
+              type="text"
+              placeholder="Title"
+              className="w-full mb-2 p-2 border rounded"
+              value={uploadData.title}
+              onChange={(e) => setUploadData({ ...uploadData, title: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Subject"
+              className="w-full mb-2 p-2 border rounded"
+              value={uploadData.subject}
+              onChange={(e) => setUploadData({ ...uploadData, subject: e.target.value })}
+            />
+            <input type="file" className="mb-4" onChange={handleFileChange} />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowUpload(false)} className="px-4 py-2 bg-gray-400 rounded text-white">
+                Cancel
+              </button>
+              <button onClick={handleUpload} className="px-4 py-2 bg-green-600 rounded text-white">
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
