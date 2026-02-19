@@ -37,74 +37,65 @@ pool.connect()
 
 
 
-
 const storage = new CloudinaryStorage({
-  cloudinary: cloudinary.v2,
+  cloudinary,
   params: {
     folder: "academics",
-    resource_type: "raw", // allows PDF
+    resource_type: "raw", // for PDFs
+    allowed_formats: ["pdf"],
   },
 });
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype === "application/pdf") cb(null, true);
-  else cb(new Error("Only PDFs are allowed"), false);
-};
-const upload = multer({ storage, fileFilter });
+
+const upload = multer({ storage });
 
 
 
 // ================= ROUTES =================
 
-
-// Get all academics by type
-app.get("/academics/:type", async (req, res) => {
+// Get all academics
+app.get("/academics", async (req, res) => {
   try {
-    const { type } = req.params;
-    const { semester } = req.query;
-    let query = "SELECT * FROM academics WHERE type=$1";
-    const params = [type];
-
-    if (semester) {
-      query += " AND semester=$2";
-      params.push(semester);
-    }
-
-    query += " ORDER BY created_at DESC";
-
-    const { rows } = await pool.query(query, params);
+    const { rows } = await pool.query("SELECT * FROM academics ORDER BY created_at DESC");
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Fetch failed" });
+    res.status(500).json({ message: "Failed to fetch academics" });
   }
 });
 
-// Upload academic PDF
+// Upload PDF
 app.post("/academics", upload.single("file"), async (req, res) => {
   try {
     const { title, semester, subject, type } = req.body;
-    if (!req.file) return res.status(400).json({ message: "File is required" });
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     const file_url = req.file.path; // Cloudinary URL
-    const result = await pool.query(
-      "INSERT INTO academics(title, semester, subject, type, file_url) VALUES($1,$2,$3,$4,$5) RETURNING *",
+
+    const { rows } = await pool.query(
+      `INSERT INTO academics(title, semester, subject, type, file_url) 
+       VALUES($1,$2,$3,$4,$5) RETURNING *`,
       [title, semester, subject, type, file_url]
     );
-    res.json(result.rows[0]);
+    res.json(rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: err.message || "Upload failed" });
+    res.status(500).json({ message: "Upload failed" });
   }
 });
 
-// Delete academic file
+// Delete
 app.delete("/academics/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    // Delete from database
-    const { rows } = await pool.query("DELETE FROM academics WHERE id=$1 RETURNING *", [id]);
+    const { rows } = await pool.query("SELECT file_url FROM academics WHERE id=$1", [id]);
     if (!rows.length) return res.status(404).json({ message: "Not found" });
-    res.json({ message: "Deleted successfully ✅" });
+
+    // Delete from Cloudinary
+    const publicId = rows[0].file_url.split("/").pop().split(".")[0];
+    await cloudinary.uploader.destroy(`academics/${publicId}`, { resource_type: "raw" });
+
+    await pool.query("DELETE FROM academics WHERE id=$1", [id]);
+    res.json({ message: "Deleted ✅" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Delete failed" });

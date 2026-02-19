@@ -1,40 +1,33 @@
-import { useState, useEffect, useRef } from "react";
-import { FiDownload, FiTrash2, FiUpload, FiEye } from "react-icons/fi";
+import { useEffect, useState, useRef } from "react";
+import { FiUpload, FiTrash2, FiEye, FiDownload } from "react-icons/fi";
 
 const semesters = [2, 3, 4, 5, 6, 7, 8];
-const types = [
-  { key: "notes", label: "Notes" },
-  { key: "papers", label: "Question Papers" },
-  { key: "syllabus", label: "Syllabus" },
-  { key: "previous", label: "Previous QPs" },
-];
-
-const API = process.env.REACT_APP_API_URL;
+const types = ["notes", "papers", "syllabus", "previous"];
 
 export default function Academics() {
-  const [activeType, setActiveType] = useState("notes");
-  const [openSem, setOpenSem] = useState(2);
   const [data, setData] = useState([]);
+  const [activeType, setActiveType] = useState("notes");
+  const [openSem, setOpenSem] = useState(null);
   const [uploadInfo, setUploadInfo] = useState(null);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef();
 
-  // Fetch data by type
+  const API = process.env.REACT_APP_API_URL;
+
+  // Fetch
   const fetchData = async () => {
     try {
-      const res = await fetch(`${API}/academics/${activeType}`);
-      if (!res.ok) throw new Error("Fetch failed");
-      setData(await res.json());
+      const res = await fetch(`${API}/academics`);
+      const json = await res.json();
+      setData(json);
     } catch (err) {
       console.error(err);
-      alert("Failed to load data");
+      alert("Failed to fetch data");
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [activeType]);
+  useEffect(() => fetchData(), []);
 
-  // Handle delete
+  // Delete
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this file?")) return;
     try {
@@ -46,7 +39,7 @@ export default function Academics() {
     }
   };
 
-  // Start upload
+  // Upload
   const startUpload = (semester) => {
     const title = prompt("Enter title");
     const subject = prompt("Enter subject");
@@ -55,50 +48,44 @@ export default function Academics() {
     fileInputRef.current.click();
   };
 
-  // Upload file
   const handleFileChange = async (e) => {
+    if (!uploadInfo) return;
     const file = e.target.files[0];
-    if (!file || !uploadInfo) return;
+    if (!file) return alert("Select a PDF file");
 
     const formData = new FormData();
     formData.append("title", uploadInfo.title);
-    formData.append("subject", uploadInfo.subject);
     formData.append("semester", uploadInfo.semester);
+    formData.append("subject", uploadInfo.subject);
     formData.append("type", activeType);
     formData.append("file", file);
 
     try {
       const res = await fetch(`${API}/academics`, { method: "POST", body: formData });
       if (!res.ok) throw new Error();
+      setUploadInfo(null);
       fetchData();
     } catch (err) {
       console.error(err);
       alert("Upload failed");
     }
-
-    e.target.value = "";
-    setUploadInfo(null);
   };
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-3xl md:text-4xl font-extrabold mb-8 text-center">
-        HITS AIML Academics
-      </h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">HITS AIML Academics</h1>
 
       {/* Type Tabs */}
-      <div className="flex justify-center gap-4 mb-6">
+      <div className="flex justify-center gap-3 mb-6">
         {types.map((t) => (
           <button
-            key={t.key}
-            onClick={() => setActiveType(t.key)}
-            className={`px-5 py-2 rounded-full font-semibold transition ${
-              activeType === t.key
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 hover:bg-blue-500 hover:text-white"
+            key={t}
+            onClick={() => setActiveType(t)}
+            className={`px-4 py-2 rounded-full font-semibold ${
+              activeType === t ? "bg-blue-600 text-white" : "bg-gray-200"
             }`}
           >
-            {t.label}
+            {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -113,61 +100,41 @@ export default function Academics() {
 
       {/* Semesters */}
       {semesters.map((sem) => {
-        const semData = data.filter((item) => Number(item.semester) === Number(sem));
+        const semData = data.filter((d) => d.semester === sem && d.type === activeType);
         return (
-          <div key={sem} className="mb-6 bg-white shadow rounded-lg">
+          <div key={sem} className="mb-4 bg-white shadow rounded-lg">
             <button
-              onClick={() => setOpenSem(sem)}
-              className="w-full px-6 py-4 flex justify-between bg-gray-100 font-semibold"
+              className="w-full px-6 py-3 bg-gray-100 flex justify-between"
+              onClick={() => setOpenSem(openSem === sem ? null : sem)}
             >
-              Semester {sem}
-              <span>{openSem === sem ? "−" : "+"}</span>
+              Semester {sem} {openSem === sem ? "−" : "+"}
             </button>
 
             {openSem === sem && (
-              <div className="p-6">
+              <div className="p-4">
                 <div className="flex justify-end mb-4">
                   <button
                     onClick={() => startUpload(sem)}
-                    className="flex items-center gap-2 bg-green-600 text-white px-5 py-2 rounded"
+                    className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
                   >
-                    <FiUpload /> Upload PDF
+                    <FiUpload /> Upload
                   </button>
                 </div>
 
                 {semData.length ? (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {semData.map((item) => (
                       <div key={item.id} className="p-4 bg-gray-50 rounded shadow flex flex-col justify-between">
-                        <h2 className="font-semibold">{item.title}</h2>
-                        <p className="text-sm text-gray-600">Subject: {item.subject}</p>
-                        <div className="flex justify-end gap-2 mt-4">
-                          {item.file_url && (
-                            <>
-                              <a
-                                href={item.file_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="p-2 bg-blue-600 text-white rounded"
-                                title="View"
-                              >
-                                <FiEye />
-                              </a>
-                              <a
-                                href={item.file_url}
-                                download
-                                className="p-2 bg-green-600 text-white rounded"
-                                title="Download"
-                              >
-                                <FiDownload />
-                              </a>
-                            </>
-                          )}
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="p-2 bg-red-600 text-white rounded"
-                            title="Delete"
-                          >
+                        <p className="font-semibold">{item.title}</p>
+                        <small className="text-gray-500">Subject: {item.subject}</small>
+                        <div className="flex gap-2 mt-2">
+                          <a href={item.file_url} target="_blank" rel="noreferrer" className="bg-blue-600 text-white p-2 rounded">
+                            <FiEye />
+                          </a>
+                          <a href={item.file_url} download className="bg-green-600 text-white p-2 rounded">
+                            <FiDownload />
+                          </a>
+                          <button onClick={() => handleDelete(item.id)} className="bg-red-600 text-white p-2 rounded">
                             <FiTrash2 />
                           </button>
                         </div>
