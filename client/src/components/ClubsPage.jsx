@@ -14,6 +14,7 @@ export default function Clubs() {
     fetchClubs();
   }, []);
 
+  // --- FETCH CLUBS ---
   const fetchClubs = async () => {
     try {
       const res = await axios.get(`${API}/clubs`);
@@ -23,6 +24,7 @@ export default function Clubs() {
     }
   };
 
+  // --- FETCH CLUB MEMBERS ---
   const fetchMembers = async (clubId) => {
     if (!clubId) return;
     try {
@@ -35,6 +37,7 @@ export default function Clubs() {
     }
   };
 
+  // --- DELETE CLUB ---
   const handleDeleteClub = async (id) => {
     if (!window.confirm("Are you sure you want to delete this club?")) return;
     try {
@@ -47,7 +50,7 @@ export default function Clubs() {
     }
   };
 
-  // --- Create Club Modal ---
+  // --- CREATE CLUB MODAL ---
   const CreateClubModal = ({ isOpen, onClose }) => {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
@@ -100,7 +103,7 @@ export default function Clubs() {
     );
   };
 
-  // --- Join Club Modal ---
+  // --- JOIN CLUB MODAL ---
   const JoinClubModal = ({ isOpen, onClose, clubId }) => {
     const [name, setName] = useState("");
     const [rollNo, setRollNo] = useState("");
