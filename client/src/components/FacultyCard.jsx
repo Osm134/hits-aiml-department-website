@@ -2,11 +2,12 @@ export default function FacultyCard({ faculty, onEdit, onDelete }) {
   return (
     <div className="bg-white border rounded-lg shadow hover:shadow-lg transition p-4 sm:p-6 flex flex-col items-center">
       <div className="w-28 h-28 sm:w-44 sm:h-44 mb-4 sm:mb-5 relative">
-        <img
-          src={faculty.image_url ? `${process.env.REACT_APP_API_URL}${faculty.image_url}` : "/faculty.jpg"}
-          alt={faculty.name}
-          className="w-full h-full object-cover rounded-full border-4 border-gray-200"
-        />
+       <img
+  src={faculty.image_url || "/faculty.jpg"}
+  alt={faculty.name}
+  className="w-full h-full object-cover rounded-full border-4 border-gray-200"
+/>
+
       </div>
 
       <h2 className="text-base sm:text-lg font-semibold text-gray-800 text-center">{faculty.name}</h2>

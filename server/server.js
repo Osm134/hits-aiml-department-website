@@ -5,70 +5,69 @@ import bcrypt from "bcryptjs";
 import cors from "cors";
 import dotenv from "dotenv";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
+import cloudinary from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "/mnt/data/uploads";
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
-const getUploadPath = (category) => {
-  const dir = path.join(UPLOAD_DIR, category);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  return dir;
-};
-
-// Middleware
-app.use(cors({ origin: process.env.REACT_APP_ALLOWED_ORIGIN || "*", credentials: true }));
+// ================= MIDDLEWARE =================
+app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
-app.use("/uploads", express.static(UPLOAD_DIR));
 
-// Database
+// ================= CLOUDINARY CONFIG =================
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// ================= DATABASE =================
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
 });
 
 pool.connect()
   .then(() => console.log("✅ PostgreSQL Connected"))
-  .catch(err => console.error("❌ pool Error:", err));
+  .catch(err => console.error("❌ PostgreSQL Error:", err));
 
-// Multer setup
-const createMulterStorage = (category, fileTypes, maxSizeMB) => multer({
-  storage: multer.diskStorage({
-    destination: (_, __, cb) => cb(null, getUploadPath(category)),
-    filename: (_, file, cb) => cb(null, Date.now() + "-" + file.originalname.replace(/\s+/g, "_")),
-  }),
-  limits: { fileSize: maxSizeMB * 1024 * 1024 },
-  fileFilter: (_, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!fileTypes.includes(ext)) return cb(new Error(`Only ${fileTypes.join(", ")} allowed`));
-    cb(null, true);
-  }
+// ================= MULTER (CLOUDINARY) =================
+const facultyStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "faculty",
+    allowed_formats: ["jpg", "jpeg", "png"],
+    transformation: [{ width: 500, height: 500, crop: "limit" }],
+  },
 });
 
-const uploadImage = (category) => createMulterStorage(category, [".jpg", ".jpeg", ".png"], 5);
+const uploadFacultyImage = multer({
+  storage: facultyStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
-/* ================= AUTH ================= */
+
+// ================= AUTH =================
 app.post("/register", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
-    const exists = await pool.query("SELECT id FROM users WHERE email=$1", [email]);
-    if (exists.rows.length) return res.status(400).json({ message: "User already exists" });
+
+    const exists = await pool.query(
+      "SELECT id FROM users WHERE email=$1",
+      [email]
+    );
+    if (exists.rows.length)
+      return res.status(400).json({ message: "User already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
+
     const result = await pool.query(
-      "INSERT INTO users(name,email,password,role) VALUES($1,$2,$3,$4) RETURNING id,name,email,role",
+      `INSERT INTO users(name,email,password,role)
+       VALUES($1,$2,$3,$4)
+       RETURNING id,name,email,role`,
       [name, email, hashed, role]
     );
 
@@ -82,15 +81,21 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const result = await pool.query("SELECT * FROM users WHERE email=$1", [email]);
-    if (!result.rows.length) return res.status(401).json({ message: "User not found" });
+
+    const result = await pool.query(
+      "SELECT * FROM users WHERE email=$1",
+      [email]
+    );
+    if (!result.rows.length)
+      return res.status(401).json({ message: "User not found" });
 
     const user = result.rows[0];
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ message: "Wrong password" });
+    if (!match)
+      return res.status(401).json({ message: "Wrong password" });
 
     const token = jwt.sign(
-      { id: user.id, name: user.name, email: user.email, role: user.role },
+      { id: user.id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
@@ -102,41 +107,38 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ================= FACULTY MODULE ================= */
-// Example: inside your faculty upload route
-app.post("/faculty", uploadImage("faculty").single("image"), async (req, res) => {
-  const { name, department, email } = req.body;
+// ================= FACULTY MODULE =================
 
-  let image_url = null;
+// CREATE
+app.post("/faculty", uploadFacultyImage.single("image"), async (req, res) => {
+  try {
+    const { name, designation, subject, email } = req.body;
 
-  if (req.file) {
-    const filePath = path.join(UPLOAD_DIR, "faculty", req.file.filename);
+    const image_url = req.file?.path || null;
+    const image_public_id = req.file?.filename || null;
 
-    // Upload to Cloudinary
-    try {
-      const result = await cloudinary.uploader.upload(filePath, {
-        upload_preset: "ml_default"
-      });
-      console.log("Cloudinary upload result:", result); // <-- This will show if upload worked
-      image_url = result.secure_url; // Use Cloudinary URL instead of local path
-    } catch (err) {
-      console.error("Cloudinary upload failed:", err);
-      image_url = `/faculty/${req.file.filename}`; // fallback to local
-    }
+    console.log("☁️ Uploaded to Cloudinary:", image_url);
+
+    const result = await pool.query(
+      `INSERT INTO faculty(name,designation,subject,email,image_url,image_public_id)
+       VALUES($1,$2,$3,$4,$5,$6)
+       RETURNING *`,
+      [name, designation, subject, email, image_url, image_public_id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to add faculty" });
   }
-
-  const resultDB = await pool.query(
-    "INSERT INTO faculty(name, department, email, image_url) VALUES($1,$2,$3,$4) RETURNING *",
-    [name, department, email, image_url]
-  );
-
-  res.json(resultDB.rows[0]);
 });
 
-
+// READ
 app.get("/faculty", async (_, res) => {
   try {
-    const result = await pool.query("SELECT * FROM faculty ORDER BY name");
+    const result = await pool.query(
+      "SELECT * FROM faculty ORDER BY name"
+    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -144,25 +146,42 @@ app.get("/faculty", async (_, res) => {
   }
 });
 
-app.put("/faculty/:id", uploadImage("faculty").single("image"), async (req, res) => {
+// UPDATE
+app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, designation, subject, email } = req.body;
 
     let image_url = null;
+    let image_public_id = null;
+
     if (req.file) {
-      image_url = `/faculty/${req.file.filename}`;
-      // Delete old image
-      const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
-      if (old.rows.length && old.rows[0].image_url) {
-        const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      const old = await pool.query(
+        "SELECT image_public_id FROM faculty WHERE id=$1",
+        [id]
+      );
+
+      if (old.rows[0]?.image_public_id) {
+        await cloudinary.uploader.destroy(old.rows[0].image_public_id);
+        console.log("🗑️ Old Cloudinary image deleted");
       }
+
+      image_url = req.file.path;
+      image_public_id = req.file.filename;
+      console.log("☁️ Updated image uploaded:", image_url);
     }
 
     const result = await pool.query(
-      "UPDATE faculty SET name=$1, designation=$2, subject=$3, email=$4, image_url=COALESCE($5,image_url) WHERE id=$6 RETURNING *",
-      [name, designation, subject, email, image_url, id]
+      `UPDATE faculty SET
+        name=$1,
+        designation=$2,
+        subject=$3,
+        email=$4,
+        image_url=COALESCE($5,image_url),
+        image_public_id=COALESCE($6,image_public_id)
+       WHERE id=$7
+       RETURNING *`,
+      [name, designation, subject, email, image_url, image_public_id, id]
     );
 
     res.json(result.rows[0]);
@@ -172,15 +191,23 @@ app.put("/faculty/:id", uploadImage("faculty").single("image"), async (req, res)
   }
 });
 
+// DELETE
 app.delete("/faculty/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
-    if (old.rows.length && old.rows[0].image_url) {
-      const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+
+    const old = await pool.query(
+      "SELECT image_public_id FROM faculty WHERE id=$1",
+      [id]
+    );
+
+    if (old.rows[0]?.image_public_id) {
+      await cloudinary.uploader.destroy(old.rows[0].image_public_id);
+      console.log("🗑️ Cloudinary image deleted");
     }
+
     await pool.query("DELETE FROM faculty WHERE id=$1", [id]);
+
     res.json({ message: "Faculty deleted ✅" });
   } catch (err) {
     console.error(err);
@@ -190,447 +217,448 @@ app.delete("/faculty/:id", async (req, res) => {
 
 
 
-/* ================= DAILY UPDATES ================= */
-app.post("/updates", async (req, res) => {
-  const { title, description, image_url } = req.body;
-  const result = await pool.query(
-    "INSERT INTO daily_updates(title,description,image_url) VALUES($1,$2,$3) RETURNING *",
-    [title, description, image_url]
-  );
-  res.json(result.rows[0]);
-});
 
-app.get("/updates", async (_, res) => {
-  const result = await pool.query("SELECT * FROM daily_updates ORDER BY created_at DESC");
-  res.json(result.rows);
-});
+// /* ================= DAILY UPDATES ================= */
+// app.post("/updates", async (req, res) => {
+//   const { title, description, image_url } = req.body;
+//   const result = await pool.query(
+//     "INSERT INTO daily_updates(title,description,image_url) VALUES($1,$2,$3) RETURNING *",
+//     [title, description, image_url]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.put("/updates/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, description } = req.body;
-    const result = await pool.query(
-      "UPDATE daily_updates SET title=$1, description=$2 WHERE id=$3 RETURNING *",
-      [title, description, id]
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Update failed" });
-  }
-});
+// app.get("/updates", async (_, res) => {
+//   const result = await pool.query("SELECT * FROM daily_updates ORDER BY created_at DESC");
+//   res.json(result.rows);
+// });
 
-app.delete("/updates/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query("DELETE FROM daily_updates WHERE id=$1", [id]);
-    res.json({ message: "Update deleted ✅" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Delete failed" });
-  }
-});
+// app.put("/updates/:id", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { title, description } = req.body;
+//     const result = await pool.query(
+//       "UPDATE daily_updates SET title=$1, description=$2 WHERE id=$3 RETURNING *",
+//       [title, description, id]
+//     );
+//     res.json(result.rows[0]);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Update failed" });
+//   }
+// });
 
-/* ================= NOTES / PAPERS / SYLLABUS / EXAM ================= */
-// Factory for update endpoints with file replacement
-const updateFileEndpoint = (table, category) => async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, semester, subject } = req.body;
-    let file_url = null;
+// app.delete("/updates/:id", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     await pool.query("DELETE FROM daily_updates WHERE id=$1", [id]);
+//     res.json({ message: "Update deleted ✅" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Delete failed" });
+//   }
+// });
 
-    if (req.file) {
-      file_url = `/${category}/${req.file.filename}`;
+// /* ================= NOTES / PAPERS / SYLLABUS / EXAM ================= */
+// // Factory for update endpoints with file replacement
+// const updateFileEndpoint = (table, category) => async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { title, semester, subject } = req.body;
+//     let file_url = null;
 
-      // Delete old file
-      const old = await pool.query(`SELECT file_url FROM ${table} WHERE id=$1`, [id]);
-      if (old.rows.length && old.rows[0].file_url) {
-        const oldPath = path.join(UPLOAD_DIR, old.rows[0].file_url);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
-    }
+//     if (req.file) {
+//       file_url = `/${category}/${req.file.filename}`;
 
-    const result = await pool.query(
-      `UPDATE ${table} 
-       SET title=$1, semester=$2, subject=$3,
-           file_url=COALESCE($4,file_url)
-       WHERE id=$5 RETURNING *`,
-      [title, semester, subject, file_url, id]
-    );
+//       // Delete old file
+//       const old = await pool.query(`SELECT file_url FROM ${table} WHERE id=$1`, [id]);
+//       if (old.rows.length && old.rows[0].file_url) {
+//         const oldPath = path.join(UPLOAD_DIR, old.rows[0].file_url);
+//         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//       }
+//     }
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Update failed" });
-  }
-};
+//     const result = await pool.query(
+//       `UPDATE ${table} 
+//        SET title=$1, semester=$2, subject=$3,
+//            file_url=COALESCE($4,file_url)
+//        WHERE id=$5 RETURNING *`,
+//       [title, semester, subject, file_url, id]
+//     );
 
-// Notes
-app.post("/notes", uploadPDF("notes").single("file"), async (req, res) => {
-  const { title, semester, subject } = req.body;
-  const file_url = `/notes/${req.file.filename}`;
-  const result = await pool.query(
-    "INSERT INTO notes(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
-    [title, semester, subject, file_url]
-  );
-  res.json(result.rows[0]);
-});
+//     res.json(result.rows[0]);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Update failed" });
+//   }
+// };
 
-app.get("/notes", async (_, res) => {
-  const result = await pool.query("SELECT * FROM notes ORDER BY created_at DESC");
-  res.json(result.rows);
-});
+// // Notes
+// app.post("/notes", uploadPDF("notes").single("file"), async (req, res) => {
+//   const { title, semester, subject } = req.body;
+//   const file_url = `/notes/${req.file.filename}`;
+//   const result = await pool.query(
+//     "INSERT INTO notes(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
+//     [title, semester, subject, file_url]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.put("/notes/:id", uploadPDF("notes").single("file"), updateFileEndpoint("notes", "notes"));
-app.delete("/notes/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rows } = await pool.query("SELECT file_url FROM notes WHERE id=$1", [id]);
-    if (rows.length && rows[0].file_url) {
-      const filePath = path.join(UPLOAD_DIR, rows[0].file_url);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
-    await pool.query("DELETE FROM notes WHERE id=$1", [id]);
-    res.json({ message: "Note deleted ✅" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Delete failed" });
-  }
-});
+// app.get("/notes", async (_, res) => {
+//   const result = await pool.query("SELECT * FROM notes ORDER BY created_at DESC");
+//   res.json(result.rows);
+// });
 
-// Question papers
-app.post("/papers", uploadPDF("papers").single("file"), async (req, res) => {
-  const { title, semester, subject } = req.body;
-  const file_url = `/papers/${req.file.filename}`;
-  const result = await pool.query(
-    "INSERT INTO question_papers(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
-    [title, semester, subject, file_url]
-  );
-  res.json(result.rows[0]);
-});
+// app.put("/notes/:id", uploadPDF("notes").single("file"), updateFileEndpoint("notes", "notes"));
+// app.delete("/notes/:id", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { rows } = await pool.query("SELECT file_url FROM notes WHERE id=$1", [id]);
+//     if (rows.length && rows[0].file_url) {
+//       const filePath = path.join(UPLOAD_DIR, rows[0].file_url);
+//       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+//     }
+//     await pool.query("DELETE FROM notes WHERE id=$1", [id]);
+//     res.json({ message: "Note deleted ✅" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Delete failed" });
+//   }
+// });
 
-app.get("/papers", async (_, res) => {
-  const result = await pool.query("SELECT * FROM question_papers");
-  res.json(result.rows);
-});
+// // Question papers
+// app.post("/papers", uploadPDF("papers").single("file"), async (req, res) => {
+//   const { title, semester, subject } = req.body;
+//   const file_url = `/papers/${req.file.filename}`;
+//   const result = await pool.query(
+//     "INSERT INTO question_papers(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
+//     [title, semester, subject, file_url]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.put("/papers/:id", uploadPDF("papers").single("file"), updateFileEndpoint("question_papers", "papers"));
-app.delete("/papers/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rows } = await pool.query("SELECT file_url FROM question_papers WHERE id=$1", [id]);
-    if (rows.length && rows[0].file_url) {
-      const filePath = path.join(UPLOAD_DIR, rows[0].file_url);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
-    await pool.query("DELETE FROM question_papers WHERE id=$1", [id]);
-    res.json({ message: "Paper deleted ✅" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Delete failed" });
-  }
-});
+// app.get("/papers", async (_, res) => {
+//   const result = await pool.query("SELECT * FROM question_papers");
+//   res.json(result.rows);
+// });
 
-// Syllabus
-app.post("/syllabus", uploadPDF("syllabus").single("file"), async (req, res) => {
-  const { title, semester, subject } = req.body;
-  const file_url = `/syllabus/${req.file.filename}`;
-  const result = await pool.query(
-    "INSERT INTO syllabus(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
-    [title, semester, subject, file_url]
-  );
-  res.json(result.rows[0]);
-});
+// app.put("/papers/:id", uploadPDF("papers").single("file"), updateFileEndpoint("question_papers", "papers"));
+// app.delete("/papers/:id", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { rows } = await pool.query("SELECT file_url FROM question_papers WHERE id=$1", [id]);
+//     if (rows.length && rows[0].file_url) {
+//       const filePath = path.join(UPLOAD_DIR, rows[0].file_url);
+//       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+//     }
+//     await pool.query("DELETE FROM question_papers WHERE id=$1", [id]);
+//     res.json({ message: "Paper deleted ✅" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Delete failed" });
+//   }
+// });
 
-app.get("/syllabus", async (_, res) => {
-  const result = await pool.query("SELECT * FROM syllabus ORDER BY semester");
-  res.json(result.rows);
-});
+// // Syllabus
+// app.post("/syllabus", uploadPDF("syllabus").single("file"), async (req, res) => {
+//   const { title, semester, subject } = req.body;
+//   const file_url = `/syllabus/${req.file.filename}`;
+//   const result = await pool.query(
+//     "INSERT INTO syllabus(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
+//     [title, semester, subject, file_url]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.put("/syllabus/:id", uploadPDF("syllabus").single("file"), updateFileEndpoint("syllabus", "syllabus"));
-app.delete("/syllabus/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rows } = await pool.query("SELECT file_url FROM syllabus WHERE id=$1", [id]);
-    if (rows.length && rows[0].file_url) {
-      const filePath = path.join(UPLOAD_DIR, rows[0].file_url);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
-    await pool.query("DELETE FROM syllabus WHERE id=$1", [id]);
-    res.json({ message: "Syllabus deleted ✅" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Delete failed" });
-  }
-});
+// app.get("/syllabus", async (_, res) => {
+//   const result = await pool.query("SELECT * FROM syllabus ORDER BY semester");
+//   res.json(result.rows);
+// });
 
-/* ================= DOWNLOAD ENDPOINT ================= */
-app.get("/download/:type/:id", async (req, res) => {
-  try {
-    const { type, id } = req.params;
-    let table;
-    if (type === "notes") table = "notes";
-    else if (type === "papers") table = "question_papers";
-    else if (type === "syllabus") table = "syllabus";
-    else if (type === "exam-timetable") table = "exam_timetable";
-    else return res.status(400).json({ message: "Invalid type" });
+// app.put("/syllabus/:id", uploadPDF("syllabus").single("file"), updateFileEndpoint("syllabus", "syllabus"));
+// app.delete("/syllabus/:id", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { rows } = await pool.query("SELECT file_url FROM syllabus WHERE id=$1", [id]);
+//     if (rows.length && rows[0].file_url) {
+//       const filePath = path.join(UPLOAD_DIR, rows[0].file_url);
+//       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+//     }
+//     await pool.query("DELETE FROM syllabus WHERE id=$1", [id]);
+//     res.json({ message: "Syllabus deleted ✅" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Delete failed" });
+//   }
+// });
 
-    const data = await pool.query(`SELECT file_url, title FROM ${table} WHERE id=$1`, [id]);
-    if (!data.rows.length) return res.status(404).json({ message: "File not found" });
+// /* ================= DOWNLOAD ENDPOINT ================= */
+// app.get("/download/:type/:id", async (req, res) => {
+//   try {
+//     const { type, id } = req.params;
+//     let table;
+//     if (type === "notes") table = "notes";
+//     else if (type === "papers") table = "question_papers";
+//     else if (type === "syllabus") table = "syllabus";
+//     else if (type === "exam-timetable") table = "exam_timetable";
+//     else return res.status(400).json({ message: "Invalid type" });
 
-    const filePath = path.join(UPLOAD_DIR, data.rows[0].file_url);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File missing" });
+//     const data = await pool.query(`SELECT file_url, title FROM ${table} WHERE id=$1`, [id]);
+//     if (!data.rows.length) return res.status(404).json({ message: "File not found" });
 
-    res.download(filePath, path.basename(data.rows[0].file_url));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Download failed" });
-  }
-});
+//     const filePath = path.join(UPLOAD_DIR, data.rows[0].file_url);
+//     if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File missing" });
 
-/* ================= OTHER MODULES ================= */
-/* ================= OTHER MODULES FULLY IMPLEMENTED ================= */
+//     res.download(filePath, path.basename(data.rows[0].file_url));
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Download failed" });
+//   }
+// });
+
+// /* ================= OTHER MODULES ================= */
+// /* ================= OTHER MODULES FULLY IMPLEMENTED ================= */
 
 
-/* ========== STUDENTS MODULE ========== */
-app.post("/students", uploadImage("students").single("image"), async (req, res) => {
-  const { name, roll_no, email, department } = req.body;
-  const image_url = req.file ? `/students/${req.file.filename}` : null;
-  const result = await pool.query(
-    "INSERT INTO students(name, roll_no, email, department, image_url) VALUES($1,$2,$3,$4,$5) RETURNING *",
-    [name, roll_no, email, department, image_url]
-  );
-  res.json(result.rows[0]);
-});
+// /* ========== STUDENTS MODULE ========== */
+// app.post("/students", uploadImage("students").single("image"), async (req, res) => {
+//   const { name, roll_no, email, department } = req.body;
+//   const image_url = req.file ? `/students/${req.file.filename}` : null;
+//   const result = await pool.query(
+//     "INSERT INTO students(name, roll_no, email, department, image_url) VALUES($1,$2,$3,$4,$5) RETURNING *",
+//     [name, roll_no, email, department, image_url]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.get("/students", async (_, res) => {
-  const result = await pool.query("SELECT * FROM students ORDER BY roll_no");
-  res.json(result.rows);
-});
+// app.get("/students", async (_, res) => {
+//   const result = await pool.query("SELECT * FROM students ORDER BY roll_no");
+//   res.json(result.rows);
+// });
 
-app.put("/students/:id", uploadImage("students").single("image"), async (req, res) => {
-  const { id } = req.params;
-  const { name, roll_no, email, department } = req.body;
+// app.put("/students/:id", uploadImage("students").single("image"), async (req, res) => {
+//   const { id } = req.params;
+//   const { name, roll_no, email, department } = req.body;
 
-  let image_url = null;
-  if (req.file) {
-    image_url = `/students/${req.file.filename}`;
-    const old = await pool.query("SELECT image_url FROM students WHERE id=$1", [id]);
-    if (old.rows.length && old.rows[0].image_url) {
-      const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
-  }
+//   let image_url = null;
+//   if (req.file) {
+//     image_url = `/students/${req.file.filename}`;
+//     const old = await pool.query("SELECT image_url FROM students WHERE id=$1", [id]);
+//     if (old.rows.length && old.rows[0].image_url) {
+//       const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
+//       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//     }
+//   }
 
-  const result = await pool.query(
-    "UPDATE students SET name=$1, roll_no=$2, email=$3, department=$4, image_url=COALESCE($5,image_url) WHERE id=$6 RETURNING *",
-    [name, roll_no, email, department, image_url, id]
-  );
-  res.json(result.rows[0]);
-});
+//   const result = await pool.query(
+//     "UPDATE students SET name=$1, roll_no=$2, email=$3, department=$4, image_url=COALESCE($5,image_url) WHERE id=$6 RETURNING *",
+//     [name, roll_no, email, department, image_url, id]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.delete("/students/:id", async (req, res) => {
-  const { id } = req.params;
-  const old = await pool.query("SELECT image_url FROM students WHERE id=$1", [id]);
-  if (old.rows.length && old.rows[0].image_url) {
-    const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-  }
-  await pool.query("DELETE FROM students WHERE id=$1", [id]);
-  res.json({ message: "Student deleted ✅" });
-});
+// app.delete("/students/:id", async (req, res) => {
+//   const { id } = req.params;
+//   const old = await pool.query("SELECT image_url FROM students WHERE id=$1", [id]);
+//   if (old.rows.length && old.rows[0].image_url) {
+//     const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
+//     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//   }
+//   await pool.query("DELETE FROM students WHERE id=$1", [id]);
+//   res.json({ message: "Student deleted ✅" });
+// });
 
-/* ========== EVENTS MODULE ========== */
-app.post("/events", uploadImage("events").single("image"), async (req, res) => {
-  const { title, description, date } = req.body;
-  const image_url = req.file ? `/events/${req.file.filename}` : null;
-  const result = await pool.query(
-    "INSERT INTO events(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
-    [title, description, date, image_url]
-  );
-  res.json(result.rows[0]);
-});
+// /* ========== EVENTS MODULE ========== */
+// app.post("/events", uploadImage("events").single("image"), async (req, res) => {
+//   const { title, description, date } = req.body;
+//   const image_url = req.file ? `/events/${req.file.filename}` : null;
+//   const result = await pool.query(
+//     "INSERT INTO events(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
+//     [title, description, date, image_url]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.get("/events", async (_, res) => {
-  const result = await pool.query("SELECT * FROM events ORDER BY date DESC");
-  res.json(result.rows);
-});
+// app.get("/events", async (_, res) => {
+//   const result = await pool.query("SELECT * FROM events ORDER BY date DESC");
+//   res.json(result.rows);
+// });
 
-app.put("/events/:id", uploadImage("events").single("image"), async (req, res) => {
-  const { id } = req.params;
-  const { title, description, date } = req.body;
+// app.put("/events/:id", uploadImage("events").single("image"), async (req, res) => {
+//   const { id } = req.params;
+//   const { title, description, date } = req.body;
 
-  let image_url = null;
-  if (req.file) {
-    image_url = `/events/${req.file.filename}`;
-    const old = await pool.query("SELECT image_url FROM events WHERE id=$1", [id]);
-    if (old.rows.length && old.rows[0].image_url) {
-      const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
-  }
+//   let image_url = null;
+//   if (req.file) {
+//     image_url = `/events/${req.file.filename}`;
+//     const old = await pool.query("SELECT image_url FROM events WHERE id=$1", [id]);
+//     if (old.rows.length && old.rows[0].image_url) {
+//       const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
+//       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//     }
+//   }
 
-  const result = await pool.query(
-    "UPDATE events SET title=$1, description=$2, date=$3, image_url=COALESCE($4,image_url) WHERE id=$5 RETURNING *",
-    [title, description, date, image_url, id]
-  );
-  res.json(result.rows[0]);
-});
+//   const result = await pool.query(
+//     "UPDATE events SET title=$1, description=$2, date=$3, image_url=COALESCE($4,image_url) WHERE id=$5 RETURNING *",
+//     [title, description, date, image_url, id]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.delete("/events/:id", async (req, res) => {
-  const { id } = req.params;
-  const old = await pool.query("SELECT image_url FROM events WHERE id=$1", [id]);
-  if (old.rows.length && old.rows[0].image_url) {
-    const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-  }
-  await pool.query("DELETE FROM events WHERE id=$1", [id]);
-  res.json({ message: "Event deleted ✅" });
-});
+// app.delete("/events/:id", async (req, res) => {
+//   const { id } = req.params;
+//   const old = await pool.query("SELECT image_url FROM events WHERE id=$1", [id]);
+//   if (old.rows.length && old.rows[0].image_url) {
+//     const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
+//     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//   }
+//   await pool.query("DELETE FROM events WHERE id=$1", [id]);
+//   res.json({ message: "Event deleted ✅" });
+// });
 
-/* ========== INTERNSHIPS MODULE (Certificates) ========== */
-app.post("/internships", uploadCertificate("internships").single("certificate"), async (req, res) => {
-  const { student_id, company, title } = req.body;
-  const certificate_url = req.file ? `/internships/${req.file.filename}` : null;
-  const result = await pool.query(
-    "INSERT INTO internships(student_id, company, title, certificate_url) VALUES($1,$2,$3,$4) RETURNING *",
-    [student_id, company, title, certificate_url]
-  );
-  res.json(result.rows[0]);
-});
+// /* ========== INTERNSHIPS MODULE (Certificates) ========== */
+// app.post("/internships", uploadCertificate("internships").single("certificate"), async (req, res) => {
+//   const { student_id, company, title } = req.body;
+//   const certificate_url = req.file ? `/internships/${req.file.filename}` : null;
+//   const result = await pool.query(
+//     "INSERT INTO internships(student_id, company, title, certificate_url) VALUES($1,$2,$3,$4) RETURNING *",
+//     [student_id, company, title, certificate_url]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.get("/internships", async (_, res) => {
-  const result = await pool.query("SELECT * FROM internships ORDER BY id DESC");
-  res.json(result.rows);
-});
+// app.get("/internships", async (_, res) => {
+//   const result = await pool.query("SELECT * FROM internships ORDER BY id DESC");
+//   res.json(result.rows);
+// });
 
-app.put("/internships/:id", uploadCertificate("internships").single("certificate"), async (req, res) => {
-  const { id } = req.params;
-  const { student_id, company, title } = req.body;
+// app.put("/internships/:id", uploadCertificate("internships").single("certificate"), async (req, res) => {
+//   const { id } = req.params;
+//   const { student_id, company, title } = req.body;
 
-  let certificate_url = null;
-  if (req.file) {
-    certificate_url = `/internships/${req.file.filename}`;
-    const old = await pool.query("SELECT certificate_url FROM internships WHERE id=$1", [id]);
-    if (old.rows.length && old.rows[0].certificate_url) {
-      const oldPath = path.join(UPLOAD_DIR, old.rows[0].certificate_url);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
-  }
+//   let certificate_url = null;
+//   if (req.file) {
+//     certificate_url = `/internships/${req.file.filename}`;
+//     const old = await pool.query("SELECT certificate_url FROM internships WHERE id=$1", [id]);
+//     if (old.rows.length && old.rows[0].certificate_url) {
+//       const oldPath = path.join(UPLOAD_DIR, old.rows[0].certificate_url);
+//       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//     }
+//   }
 
-  const result = await pool.query(
-    "UPDATE internships SET student_id=$1, company=$2, title=$3, certificate_url=COALESCE($4,certificate_url) WHERE id=$5 RETURNING *",
-    [student_id, company, title, certificate_url, id]
-  );
-  res.json(result.rows[0]);
-});
+//   const result = await pool.query(
+//     "UPDATE internships SET student_id=$1, company=$2, title=$3, certificate_url=COALESCE($4,certificate_url) WHERE id=$5 RETURNING *",
+//     [student_id, company, title, certificate_url, id]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.delete("/internships/:id", async (req, res) => {
-  const { id } = req.params;
-  const old = await pool.query("SELECT certificate_url FROM internships WHERE id=$1", [id]);
-  if (old.rows.length && old.rows[0].certificate_url) {
-    const oldPath = path.join(UPLOAD_DIR, old.rows[0].certificate_url);
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-  }
-  await pool.query("DELETE FROM internships WHERE id=$1", [id]);
-  res.json({ message: "Internship deleted ✅" });
-});
+// app.delete("/internships/:id", async (req, res) => {
+//   const { id } = req.params;
+//   const old = await pool.query("SELECT certificate_url FROM internships WHERE id=$1", [id]);
+//   if (old.rows.length && old.rows[0].certificate_url) {
+//     const oldPath = path.join(UPLOAD_DIR, old.rows[0].certificate_url);
+//     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//   }
+//   await pool.query("DELETE FROM internships WHERE id=$1", [id]);
+//   res.json({ message: "Internship deleted ✅" });
+// });
 
-/* ========== CLUBS / ACTIVITIES MODULES ========== */
-app.post("/activities", uploadImage("activities").single("image"), async (req, res) => {
-  const { title, description, date } = req.body;
-  const image_url = req.file ? `/activities/${req.file.filename}` : null;
-  const result = await pool.query(
-    "INSERT INTO activities(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
-    [title, description, date, image_url]
-  );
-  res.json(result.rows[0]);
-});
+// /* ========== CLUBS / ACTIVITIES MODULES ========== */
+// app.post("/activities", uploadImage("activities").single("image"), async (req, res) => {
+//   const { title, description, date } = req.body;
+//   const image_url = req.file ? `/activities/${req.file.filename}` : null;
+//   const result = await pool.query(
+//     "INSERT INTO activities(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
+//     [title, description, date, image_url]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.get("/activities", async (_, res) => {
-  const result = await pool.query("SELECT * FROM activities ORDER BY date DESC");
-  res.json(result.rows);
-});
+// app.get("/activities", async (_, res) => {
+//   const result = await pool.query("SELECT * FROM activities ORDER BY date DESC");
+//   res.json(result.rows);
+// });
 
-app.put("/activities/:id", uploadImage("activities").single("image"), async (req, res) => {
-  const { id } = req.params;
-  const { title, description, date } = req.body;
+// app.put("/activities/:id", uploadImage("activities").single("image"), async (req, res) => {
+//   const { id } = req.params;
+//   const { title, description, date } = req.body;
 
-  let image_url = null;
-  if (req.file) {
-    image_url = `/activities/${req.file.filename}`;
-    const old = await pool.query("SELECT image_url FROM activities WHERE id=$1", [id]);
-    if (old.rows.length && old.rows[0].image_url) {
-      const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
-  }
+//   let image_url = null;
+//   if (req.file) {
+//     image_url = `/activities/${req.file.filename}`;
+//     const old = await pool.query("SELECT image_url FROM activities WHERE id=$1", [id]);
+//     if (old.rows.length && old.rows[0].image_url) {
+//       const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
+//       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//     }
+//   }
 
-  const result = await pool.query(
-    "UPDATE activities SET title=$1, description=$2, date=$3, image_url=COALESCE($4,image_url) WHERE id=$5 RETURNING *",
-    [title, description, date, image_url, id]
-  );
-  res.json(result.rows[0]);
-});
+//   const result = await pool.query(
+//     "UPDATE activities SET title=$1, description=$2, date=$3, image_url=COALESCE($4,image_url) WHERE id=$5 RETURNING *",
+//     [title, description, date, image_url, id]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.delete("/activities/:id", async (req, res) => {
-  const { id } = req.params;
-  const old = await pool.query("SELECT image_url FROM activities WHERE id=$1", [id]);
-  if (old.rows.length && old.rows[0].image_url) {
-    const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-  }
-  await pool.query("DELETE FROM activities WHERE id=$1", [id]);
-  res.json({ message: "Activity deleted ✅" });
-});
+// app.delete("/activities/:id", async (req, res) => {
+//   const { id } = req.params;
+//   const old = await pool.query("SELECT image_url FROM activities WHERE id=$1", [id]);
+//   if (old.rows.length && old.rows[0].image_url) {
+//     const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
+//     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//   }
+//   await pool.query("DELETE FROM activities WHERE id=$1", [id]);
+//   res.json({ message: "Activity deleted ✅" });
+// });
 
-/* ========== ACADEMIC HIGHLIGHTS MODULE ========== */
-app.post("/highlights", uploadImage("highlights").single("image"), async (req, res) => {
-  const { title, description } = req.body;
-  const image_url = req.file ? `/highlights/${req.file.filename}` : null;
-  const result = await pool.query(
-    "INSERT INTO academic_highlights(title, description, image_url) VALUES($1,$2,$3) RETURNING *",
-    [title, description, image_url]
-  );
-  res.json(result.rows[0]);
-});
+// /* ========== ACADEMIC HIGHLIGHTS MODULE ========== */
+// app.post("/highlights", uploadImage("highlights").single("image"), async (req, res) => {
+//   const { title, description } = req.body;
+//   const image_url = req.file ? `/highlights/${req.file.filename}` : null;
+//   const result = await pool.query(
+//     "INSERT INTO academic_highlights(title, description, image_url) VALUES($1,$2,$3) RETURNING *",
+//     [title, description, image_url]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.get("/highlights", async (_, res) => {
-  const result = await pool.query("SELECT * FROM academic_highlights ORDER BY id DESC");
-  res.json(result.rows);
-});
+// app.get("/highlights", async (_, res) => {
+//   const result = await pool.query("SELECT * FROM academic_highlights ORDER BY id DESC");
+//   res.json(result.rows);
+// });
 
-app.put("/highlights/:id", uploadImage("highlights").single("image"), async (req, res) => {
-  const { id } = req.params;
-  const { title, description } = req.body;
+// app.put("/highlights/:id", uploadImage("highlights").single("image"), async (req, res) => {
+//   const { id } = req.params;
+//   const { title, description } = req.body;
 
-  let image_url = null;
-  if (req.file) {
-    image_url = `/highlights/${req.file.filename}`;
-    const old = await pool.query("SELECT image_url FROM academic_highlights WHERE id=$1", [id]);
-    if (old.rows.length && old.rows[0].image_url) {
-      const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
-  }
+//   let image_url = null;
+//   if (req.file) {
+//     image_url = `/highlights/${req.file.filename}`;
+//     const old = await pool.query("SELECT image_url FROM academic_highlights WHERE id=$1", [id]);
+//     if (old.rows.length && old.rows[0].image_url) {
+//       const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
+//       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//     }
+//   }
 
-  const result = await pool.query(
-    "UPDATE academic_highlights SET title=$1, description=$2, image_url=COALESCE($3,image_url) WHERE id=$4 RETURNING *",
-    [title, description, image_url, id]
-  );
-  res.json(result.rows[0]);
-});
+//   const result = await pool.query(
+//     "UPDATE academic_highlights SET title=$1, description=$2, image_url=COALESCE($3,image_url) WHERE id=$4 RETURNING *",
+//     [title, description, image_url, id]
+//   );
+//   res.json(result.rows[0]);
+// });
 
-app.delete("/highlights/:id", async (req, res) => {
-  const { id } = req.params;
-  const old = await pool.query("SELECT image_url FROM academic_highlights WHERE id=$1", [id]);
-  if (old.rows.length && old.rows[0].image_url) {
-    const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-  }
-  await pool.query("DELETE FROM academic_highlights WHERE id=$1", [id]);
-  res.json({ message: "Highlight deleted ✅" });
-});
+// app.delete("/highlights/:id", async (req, res) => {
+//   const { id } = req.params;
+//   const old = await pool.query("SELECT image_url FROM academic_highlights WHERE id=$1", [id]);
+//   if (old.rows.length && old.rows[0].image_url) {
+//     const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
+//     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+//   }
+//   await pool.query("DELETE FROM academic_highlights WHERE id=$1", [id]);
+//   res.json({ message: "Highlight deleted ✅" });
+// });
 
 /* ================= HEALTH ================= */
 app.get("/health", async (_, res) => {
