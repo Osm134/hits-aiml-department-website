@@ -188,7 +188,7 @@ app.get("/internships", async (_, res) => {
   }
 });
 
-app.post("/internships", uploadFile("internships").single("certificate"), async (req, res) => {
+app.post("/internships", uploadImage("internships").single("certificate"), async (req, res) => {
   try {
     const { name, roll_no, class: className, company } = req.body;
     const certificate_url = req.file?.path || null;
