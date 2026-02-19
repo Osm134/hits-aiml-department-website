@@ -1,5 +1,4 @@
 import express from "express";
-import pg from "pg";
 import { Pool } from "pg";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -8,50 +7,30 @@ import dotenv from "dotenv";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
-import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-
 import { fileURLToPath } from "url";
 
 dotenv.config();
 
-const port = process.env.PORT || 5000;
 const app = express();
-
+const port = process.env.PORT || 5000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ================= PERSISTENT DISK CONFIG ================= */
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "/mnt/data/uploads";
-
-// Ensure Persistent Disk directory exists
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// Helper to create category folders
 const getUploadPath = (category) => {
   const dir = path.join(UPLOAD_DIR, category);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 };
 
-/* ================= MIDDLEWARE ================= */
-const allowedOrigin = process.env.REACT_APP_ALLOWED_ORIGIN || "*";
-app.use(cors({ origin: allowedOrigin, credentials: true }));
+// Middleware
+app.use(cors({ origin: process.env.REACT_APP_ALLOWED_ORIGIN || "*", credentials: true }));
 app.use(express.json());
-
-/* Serve static files from Persistent Disk */
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-/* ================= DATABASE ================= */
-
-// Cloudinary config
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUD_API_KEY,
-  api_secret: process.env.CLOUD_API_SECRET,
-});
-
+// Database
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -61,33 +40,24 @@ const pool = new Pool({
 });
 
 pool.connect()
-
-
-/*cloudinary configuration*/
-
   .then(() => console.log("✅ PostgreSQL Connected"))
   .catch(err => console.error("❌ pool Error:", err));
 
-/* ================= MULTER STORAGE FACTORIES ================= */
-const createMulterStorage = (category, fileTypes, maxSizeMB) => {
-  return multer({
-    storage: multer.diskStorage({
-      destination: (_, __, cb) => cb(null, getUploadPath(category)),
-      filename: (_, file, cb) => cb(null, Date.now() + "-" + file.originalname.replace(/\s+/g, "_"))
-    }),
-    limits: { fileSize: maxSizeMB * 1024 * 1024 },
-    fileFilter: (_, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      if (!fileTypes.includes(ext)) return cb(new Error(`Only ${fileTypes.join(", ")} allowed`));
-      cb(null, true);
-    }
-  });
-};
+// Multer setup
+const createMulterStorage = (category, fileTypes, maxSizeMB) => multer({
+  storage: multer.diskStorage({
+    destination: (_, __, cb) => cb(null, getUploadPath(category)),
+    filename: (_, file, cb) => cb(null, Date.now() + "-" + file.originalname.replace(/\s+/g, "_")),
+  }),
+  limits: { fileSize: maxSizeMB * 1024 * 1024 },
+  fileFilter: (_, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!fileTypes.includes(ext)) return cb(new Error(`Only ${fileTypes.join(", ")} allowed`));
+    cb(null, true);
+  }
+});
 
-// File uploaders
-const uploadPDF = (category) => createMulterStorage(category, [".pdf"], 10);
 const uploadImage = (category) => createMulterStorage(category, [".jpg", ".jpeg", ".png"], 5);
-const uploadCertificate = (category) => createMulterStorage(category, [".pdf"], 5);
 
 /* ================= AUTH ================= */
 app.post("/register", async (req, res) => {
@@ -131,54 +101,93 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ message: "Login failed" });
   }
 });
-/* ========== FACULTY MODULE ========== */
+
+/* ================= FACULTY MODULE ================= */
+// Example: inside your faculty upload route
 app.post("/faculty", uploadImage("faculty").single("image"), async (req, res) => {
-  const { name, department, email } = req.body;
-  const image_url = req.file ? `/faculty/${req.file.filename}` : null;
-  const result = await pool.query(
-    "INSERT INTO faculty(name, department, email, image_url) VALUES($1,$2,$3,$4) RETURNING *",
-    [name, department, email, image_url]
-  );
-  res.json(result.rows[0]);
-});
-
-app.get("/faculty", async (_, res) => {
-  const result = await pool.query("SELECT * FROM faculty ORDER BY name");
-  res.json(result.rows);
-});
-
-app.put("/faculty/:id", uploadImage("faculty").single("image"), async (req, res) => {
-  const { id } = req.params;
   const { name, department, email } = req.body;
 
   let image_url = null;
+
   if (req.file) {
-    image_url = `/faculty/${req.file.filename}`;
-    // Delete old image
+    const filePath = path.join(UPLOAD_DIR, "faculty", req.file.filename);
+
+    // Upload to Cloudinary
+    try {
+      const result = await cloudinary.uploader.upload(filePath, {
+        upload_preset: "ml_default"
+      });
+      console.log("Cloudinary upload result:", result); // <-- This will show if upload worked
+      image_url = result.secure_url; // Use Cloudinary URL instead of local path
+    } catch (err) {
+      console.error("Cloudinary upload failed:", err);
+      image_url = `/faculty/${req.file.filename}`; // fallback to local
+    }
+  }
+
+  const resultDB = await pool.query(
+    "INSERT INTO faculty(name, department, email, image_url) VALUES($1,$2,$3,$4) RETURNING *",
+    [name, department, email, image_url]
+  );
+
+  res.json(resultDB.rows[0]);
+});
+
+
+app.get("/faculty", async (_, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM faculty ORDER BY name");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch faculty" });
+  }
+});
+
+app.put("/faculty/:id", uploadImage("faculty").single("image"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, designation, subject, email } = req.body;
+
+    let image_url = null;
+    if (req.file) {
+      image_url = `/faculty/${req.file.filename}`;
+      // Delete old image
+      const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
+      if (old.rows.length && old.rows[0].image_url) {
+        const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+    }
+
+    const result = await pool.query(
+      "UPDATE faculty SET name=$1, designation=$2, subject=$3, email=$4, image_url=COALESCE($5,image_url) WHERE id=$6 RETURNING *",
+      [name, designation, subject, email, image_url, id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to update faculty" });
+  }
+});
+
+app.delete("/faculty/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
     const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
     if (old.rows.length && old.rows[0].image_url) {
       const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     }
+    await pool.query("DELETE FROM faculty WHERE id=$1", [id]);
+    res.json({ message: "Faculty deleted ✅" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to delete faculty" });
   }
-
-  const result = await pool.query(
-    "UPDATE faculty SET name=$1, department=$2, email=$3, image_url=COALESCE($4,image_url) WHERE id=$5 RETURNING *",
-    [name, department, email, image_url, id]
-  );
-  res.json(result.rows[0]);
 });
 
-app.delete("/faculty/:id", async (req, res) => {
-  const { id } = req.params;
-  const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
-  if (old.rows.length && old.rows[0].image_url) {
-    const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-  }
-  await pool.query("DELETE FROM faculty WHERE id=$1", [id]);
-  res.json({ message: "Faculty deleted ✅" });
-});
 
 
 /* ================= DAILY UPDATES ================= */
