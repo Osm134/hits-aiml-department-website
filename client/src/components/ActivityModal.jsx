@@ -6,6 +6,7 @@ export default function ActivityModal({ open, onClose, refresh }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
       <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 relative animate-slide-in">
+        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-500 text-2xl hover:text-gray-700 transition"
@@ -17,12 +18,8 @@ export default function ActivityModal({ open, onClose, refresh }) {
           Add Department Activity
         </h2>
 
-        <EventForm
-          refresh={() => {
-            refresh();
-            onClose();
-          }}
-        />
+        {/* Form */}
+        <EventForm refresh={refresh} onClose={onClose} />
       </div>
     </div>
   );
