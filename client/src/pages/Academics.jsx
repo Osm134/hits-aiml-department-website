@@ -42,7 +42,9 @@ export default function Academics() {
     setShowModal(true);
   };
 
-  const handleFileChange = (e) => setUploadInfo({ ...uploadInfo, file: e.target.files[0] });
+  const handleFileChange = (e) => {
+    setUploadInfo({ ...uploadInfo, file: e.target.files[0] });
+  };
 
   const handleUpload = async () => {
     const { semester, title, subject, file } = uploadInfo;
@@ -68,11 +70,21 @@ export default function Academics() {
     }
   };
 
+  const downloadPDF = (url, title) => {
+    fetch(url)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const link = document.createElement("a");
+        link.href = window.URL.createObjectURL(blob);
+        link.download = title.endsWith(".pdf") ? title : `${title}.pdf`;
+        link.click();
+      });
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6 text-center">HITS AIML Academics</h1>
 
-      {/* Type Tabs */}
       <div className="flex justify-center gap-3 mb-6">
         {types.map((t) => (
           <button
@@ -85,7 +97,6 @@ export default function Academics() {
         ))}
       </div>
 
-      {/* Semesters */}
       {semesters.map((sem) => {
         const semData = data.filter((d) => d.semester === sem && d.type === activeType);
         return (
@@ -100,10 +111,7 @@ export default function Academics() {
             {openSem === sem && (
               <div className="p-4">
                 <div className="flex justify-end mb-4">
-                  <button
-                    onClick={() => openUploadModal(sem)}
-                    className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
-                  >
+                  <button onClick={() => openUploadModal(sem)} className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2">
                     <FiUpload /> Upload
                   </button>
                 </div>
@@ -115,9 +123,18 @@ export default function Academics() {
                         <p className="font-semibold">{item.title}</p>
                         <small className="text-gray-500">Subject: {item.subject}</small>
                         <div className="flex gap-2 mt-2">
-                          <a href={item.file_url} target="_blank" rel="noreferrer" className="bg-blue-600 text-white p-2 rounded"><FiEye /></a>
-                          <a href={item.file_url} download className="bg-green-600 text-white p-2 rounded"><FiDownload /></a>
-                          <button onClick={() => handleDelete(item.id)} className="bg-red-600 text-white p-2 rounded"><FiTrash2 /></button>
+                          <a href={item.file_url} target="_blank" rel="noreferrer" className="bg-blue-600 text-white p-2 rounded">
+                            <FiEye />
+                          </a>
+                          <button
+                            onClick={() => downloadPDF(item.file_url, item.title)}
+                            className="bg-green-600 text-white p-2 rounded"
+                          >
+                            <FiDownload />
+                          </button>
+                          <button onClick={() => handleDelete(item.id)} className="bg-red-600 text-white p-2 rounded">
+                            <FiTrash2 />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -131,19 +148,33 @@ export default function Academics() {
         );
       })}
 
-      {/* MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg w-96">
             <h2 className="text-xl font-bold mb-4">Upload Academic File</h2>
-
-            <input type="text" placeholder="Title" value={uploadInfo.title} onChange={(e) => setUploadInfo({ ...uploadInfo, title: e.target.value })} className="w-full mb-2 p-2 border rounded" />
-            <input type="text" placeholder="Subject" value={uploadInfo.subject} onChange={(e) => setUploadInfo({ ...uploadInfo, subject: e.target.value })} className="w-full mb-2 p-2 border rounded" />
+            <input
+              type="text"
+              placeholder="Title"
+              value={uploadInfo.title}
+              onChange={(e) => setUploadInfo({ ...uploadInfo, title: e.target.value })}
+              className="w-full mb-2 p-2 border rounded"
+            />
+            <input
+              type="text"
+              placeholder="Subject"
+              value={uploadInfo.subject}
+              onChange={(e) => setUploadInfo({ ...uploadInfo, subject: e.target.value })}
+              className="w-full mb-2 p-2 border rounded"
+            />
             <input type="file" accept="application/pdf" onChange={handleFileChange} className="w-full mb-4" />
 
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-400 text-white rounded">Cancel</button>
-              <button onClick={handleUpload} className="px-4 py-2 bg-green-600 text-white rounded">Upload</button>
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-400 text-white rounded">
+                Cancel
+              </button>
+              <button onClick={handleUpload} className="px-4 py-2 bg-green-600 text-white rounded">
+                Upload
+              </button>
             </div>
           </div>
         </div>

@@ -40,19 +40,21 @@ pool.connect()
 
 
 
-
-// CLOUDINARY STORAGE (custom filename)
+// ---------------- CLOUDINARY + MULTER ----------------
 const cloudinaryStorage = new CloudinaryStorage({
   cloudinary: cloud,
   params: async (req, file) => {
     const { semester, title, subject } = req.body;
+
+    // safe PDF filename
     const timestamp = Date.now();
     const safeTitle = title.replace(/\s+/g, "_");
     const safeSubject = subject.replace(/\s+/g, "_");
+    const filename = `sem${semester}_${safeTitle}_${safeSubject}_${timestamp}`;
 
     return {
       folder: "academics",
-      public_id: `sem${semester}_${safeTitle}_${safeSubject}_${timestamp}`,
+      public_id: filename,
       resource_type: "raw",
       format: "pdf",
     };
@@ -61,10 +63,12 @@ const cloudinaryStorage = new CloudinaryStorage({
 
 const upload = multer({ storage: cloudinaryStorage });
 
-// GET all
+// ---------------- GET ALL ----------------
 app.get("/academics", async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM academics ORDER BY created_at DESC");
+    const { rows } = await pool.query(
+      "SELECT * FROM academics ORDER BY created_at DESC"
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -72,13 +76,13 @@ app.get("/academics", async (req, res) => {
   }
 });
 
-// UPLOAD
+// ---------------- UPLOAD ----------------
 app.post("/academics", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     const { title, semester, subject, type } = req.body;
-    const file_url = req.file.path;
+    const file_url = req.file.path; // Cloudinary PDF URL
     const cloud_public_id = req.file.filename || req.file.public_id;
 
     const { rows } = await pool.query(
@@ -94,24 +98,28 @@ app.post("/academics", upload.single("file"), async (req, res) => {
   }
 });
 
-// DELETE
+// ---------------- DELETE ----------------
 app.delete("/academics/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { rows } = await pool.query("SELECT cloud_public_id FROM academics WHERE id=$1", [id]);
+    const { rows } = await pool.query(
+      "SELECT cloud_public_id FROM academics WHERE id=$1",
+      [id]
+    );
     if (!rows.length) return res.status(404).json({ message: "Not found" });
 
     const publicId = rows[0].cloud_public_id;
 
     if (publicId) await cloud.uploader.destroy(publicId, { resource_type: "raw" });
-    await pool.query("DELETE FROM academics WHERE id=$1", [id]);
 
+    await pool.query("DELETE FROM academics WHERE id=$1", [id]);
     res.json({ message: "Deleted ✅" });
   } catch (err) {
     console.error("Delete failed:", err);
     res.status(500).json({ message: "Delete failed", error: err.message });
   }
 });
+
 
 
 
