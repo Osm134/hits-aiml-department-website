@@ -18,7 +18,6 @@ export default function StudentRepModal({ isOpen, onClose, studentData, refresh 
       setClassName(studentData.class || "");
       setImage(null);
 
-      // Handle Cloudinary URLs and old relative paths
       setPreview(
         studentData.image_url
           ? studentData.image_url.startsWith("http")
@@ -56,7 +55,7 @@ export default function StudentRepModal({ isOpen, onClose, studentData, refresh 
         });
       }
 
-      refresh(); // Refresh student list
+      refresh();
       onClose();
     } catch (err) {
       console.error(err);
@@ -103,33 +102,16 @@ export default function StudentRepModal({ isOpen, onClose, studentData, refresh 
             required
             className="w-full border px-3 py-2 rounded"
           />
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="w-full"
-          />
-          {preview && (
-            <img
-              src={preview}
-              alt="preview"
-              className="w-32 h-32 object-cover rounded mt-2 mx-auto"
-            />
-          )}
+          <input type="file" accept="image/*" onChange={handleImageChange} className="w-full" />
+          {preview && <img src={preview} alt="preview" className="w-32 h-32 object-cover rounded mt-2 mx-auto" />}
           <div className="flex justify-end space-x-2 mt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className={`px-4 py-2 rounded text-white ${
-                loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
-              }`}
+              className={`px-4 py-2 rounded text-white ${loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
             >
               {loading ? (isEdit ? "Updating..." : "Adding...") : isEdit ? "Update" : "Add"}
             </button>

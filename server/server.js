@@ -31,7 +31,271 @@ pool.connect()
   .then(() => console.log("✅ PostgreSQL Connected"))
   .catch((err) => console.error("❌ PostgreSQL Connection Error:", err));
 
-// ================= MULTER + CLOUDINARY =================
+  
+// ================= MULTER + CLOUDINARY STORAGE =================
+// ================= CLOUDINARY STORAGE HELPERS =================
+const createCloudinaryStorage = (folder) =>
+  new CloudinaryStorage({
+    cloudinary: cloud,
+    params: {
+      folder,
+      allowed_formats: ["jpg", "jpeg", "png", "pdf"],
+      transformation: [{ width: 800, height: 800, crop: "limit" }],
+    },
+  });
+
+const uploadImage = (folder) => multer({ storage: createCloudinaryStorage(folder) });
+
+// ====================== ROUTES ======================
+
+// ---------- STUDENT REPRESENTATIVES ----------
+app.post("/students-rep", uploadImage("student_reps").single("image"), async (req, res) => {
+  try {
+    const { name, email, class: className } = req.body;
+    const image_url = req.file?.path || null;
+    const result = await pool.query(
+      "INSERT INTO student_representatives(name, email, class, image_url) VALUES($1,$2,$3,$4) RETURNING *",
+      [name, email, className, image_url]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create student representative." });
+  }
+});
+
+app.get("/students-rep", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM student_representatives ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch student representatives." });
+  }
+});
+
+app.put("/students-rep/:id", uploadImage("student_reps").single("image"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, class: className } = req.body;
+    const image_url = req.file?.path || null;
+    const result = await pool.query(
+      "UPDATE student_representatives SET name=$1, email=$2, class=$3, image_url=COALESCE($4,image_url) WHERE id=$5 RETURNING *",
+      [name, email, className, image_url, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update student representative." });
+  }
+});
+
+app.delete("/students-rep/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM student_representatives WHERE id=$1", [id]);
+    res.json({ message: "Student representative deleted ✅" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete student representative." });
+  }
+});
+
+// ---------- INTERNSHIPS ----------
+app.post("/internships", uploadImage("internships").single("certificate"), async (req, res) => {
+  try {
+    const { name, roll_no, class: className, company } = req.body;
+    const certificate_url = req.file?.path || null;
+    const result = await pool.query(
+      "INSERT INTO internships(name, roll_no, class, company, certificate_url) VALUES($1,$2,$3,$4,$5) RETURNING *",
+      [name, roll_no, className, company, certificate_url]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create internship." });
+  }
+});
+
+app.get("/internships", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM internships ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch internships." });
+  }
+});
+
+app.put("/internships/:id", uploadImage("internships").single("certificate"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, roll_no, class: className, company } = req.body;
+    const certificate_url = req.file?.path || null;
+    const result = await pool.query(
+      "UPDATE internships SET name=$1, roll_no=$2, class=$3, company=$4, certificate_url=COALESCE($5, certificate_url) WHERE id=$6 RETURNING *",
+      [name, roll_no, className, company, certificate_url, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update internship." });
+  }
+});
+
+app.delete("/internships/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM internships WHERE id=$1", [id]);
+    res.json({ message: "Internship deleted ✅" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete internship." });
+  }
+});
+
+// ---------- CLUBS ----------
+app.post("/clubs", async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    const result = await pool.query(
+      "INSERT INTO clubs(name, description) VALUES($1,$2) RETURNING *",
+      [name, description]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create club." });
+  }
+});
+
+app.get("/clubs", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM clubs ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch clubs." });
+  }
+});
+
+app.delete("/clubs/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM clubs WHERE id=$1", [id]);
+    res.json({ message: "Club deleted ✅" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete club." });
+  }
+});
+
+// ---------- CLUB MEMBERS ----------
+app.get("/clubs/:id/members", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("SELECT * FROM club_members WHERE club_id=$1", [id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch club members." });
+  }
+});
+
+app.post("/clubs/:id/join", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, roll_no, class: className, email } = req.body;
+    const result = await pool.query(
+      "INSERT INTO club_members(club_id, name, roll_no, class, email) VALUES($1,$2,$3,$4,$5) RETURNING *",
+      [id, name, roll_no, className, email]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to join club." });
+  }
+});
+
+// ---------- ACADEMIC HIGHLIGHTS ----------
+app.post("/highlights", uploadImage("highlights").single("image"), async (req, res) => {
+  try {
+    const { title, description } = req.body;
+    const image_url = req.file?.path || null;
+    const result = await pool.query(
+      "INSERT INTO academic_highlights(title, description, image_url) VALUES($1,$2,$3) RETURNING *",
+      [title, description, image_url]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create highlight." });
+  }
+});
+
+app.get("/highlights", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM academic_highlights ORDER BY id DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch highlights." });
+  }
+});
+
+// ---------- EVENTS ----------
+app.post("/events", uploadImage("events").single("image"), async (req, res) => {
+  try {
+    const { title, description, date } = req.body;
+    const image_url = req.file?.path || null;
+    const result = await pool.query(
+      "INSERT INTO events(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
+      [title, description, date, image_url]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create event." });
+  }
+});
+
+app.get("/events", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM events ORDER BY date DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch events." });
+  }
+});
+
+// ---------- DAILY UPDATES ----------
+app.post("/updates", uploadImage("updates").single("image"), async (req, res) => {
+  try {
+    const { title, description } = req.body;
+    const image_url = req.file?.path || null;
+    const result = await pool.query(
+      "INSERT INTO daily_updates(title, description, image_url) VALUES($1,$2,$3) RETURNING *",
+      [title, description, image_url]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create update." });
+  }
+});
+
+app.get("/updates", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM daily_updates ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch updates." });
+  }
+});
+
+// ================= MULTER + CLOUDINARY faculty  =================
 const facultyStorage = new CloudinaryStorage({
   cloudinary: cloud,
   params: {
@@ -359,53 +623,6 @@ app.listen(port, () => {
 // /* ================= OTHER MODULES FULLY IMPLEMENTED ================= */
 
 
-// /* ========== STUDENTS MODULE ========== */
-// app.post("/students", uploadImage("students").single("image"), async (req, res) => {
-//   const { name, roll_no, email, department } = req.body;
-//   const image_url = req.file ? `/students/${req.file.filename}` : null;
-//   const result = await pool.query(
-//     "INSERT INTO students(name, roll_no, email, department, image_url) VALUES($1,$2,$3,$4,$5) RETURNING *",
-//     [name, roll_no, email, department, image_url]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.get("/students", async (_, res) => {
-//   const result = await pool.query("SELECT * FROM students ORDER BY roll_no");
-//   res.json(result.rows);
-// });
-
-// app.put("/students/:id", uploadImage("students").single("image"), async (req, res) => {
-//   const { id } = req.params;
-//   const { name, roll_no, email, department } = req.body;
-
-//   let image_url = null;
-//   if (req.file) {
-//     image_url = `/students/${req.file.filename}`;
-//     const old = await pool.query("SELECT image_url FROM students WHERE id=$1", [id]);
-//     if (old.rows.length && old.rows[0].image_url) {
-//       const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-//       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//     }
-//   }
-
-//   const result = await pool.query(
-//     "UPDATE students SET name=$1, roll_no=$2, email=$3, department=$4, image_url=COALESCE($5,image_url) WHERE id=$6 RETURNING *",
-//     [name, roll_no, email, department, image_url, id]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.delete("/students/:id", async (req, res) => {
-//   const { id } = req.params;
-//   const old = await pool.query("SELECT image_url FROM students WHERE id=$1", [id]);
-//   if (old.rows.length && old.rows[0].image_url) {
-//     const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-//     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//   }
-//   await pool.query("DELETE FROM students WHERE id=$1", [id]);
-//   res.json({ message: "Student deleted ✅" });
-// });
 
 // /* ========== EVENTS MODULE ========== */
 // app.post("/events", uploadImage("events").single("image"), async (req, res) => {
@@ -455,149 +672,6 @@ app.listen(port, () => {
 //   res.json({ message: "Event deleted ✅" });
 // });
 
-// /* ========== INTERNSHIPS MODULE (Certificates) ========== */
-// app.post("/internships", uploadCertificate("internships").single("certificate"), async (req, res) => {
-//   const { student_id, company, title } = req.body;
-//   const certificate_url = req.file ? `/internships/${req.file.filename}` : null;
-//   const result = await pool.query(
-//     "INSERT INTO internships(student_id, company, title, certificate_url) VALUES($1,$2,$3,$4) RETURNING *",
-//     [student_id, company, title, certificate_url]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.get("/internships", async (_, res) => {
-//   const result = await pool.query("SELECT * FROM internships ORDER BY id DESC");
-//   res.json(result.rows);
-// });
-
-// app.put("/internships/:id", uploadCertificate("internships").single("certificate"), async (req, res) => {
-//   const { id } = req.params;
-//   const { student_id, company, title } = req.body;
-
-//   let certificate_url = null;
-//   if (req.file) {
-//     certificate_url = `/internships/${req.file.filename}`;
-//     const old = await pool.query("SELECT certificate_url FROM internships WHERE id=$1", [id]);
-//     if (old.rows.length && old.rows[0].certificate_url) {
-//       const oldPath = path.join(UPLOAD_DIR, old.rows[0].certificate_url);
-//       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//     }
-//   }
-
-//   const result = await pool.query(
-//     "UPDATE internships SET student_id=$1, company=$2, title=$3, certificate_url=COALESCE($4,certificate_url) WHERE id=$5 RETURNING *",
-//     [student_id, company, title, certificate_url, id]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.delete("/internships/:id", async (req, res) => {
-//   const { id } = req.params;
-//   const old = await pool.query("SELECT certificate_url FROM internships WHERE id=$1", [id]);
-//   if (old.rows.length && old.rows[0].certificate_url) {
-//     const oldPath = path.join(UPLOAD_DIR, old.rows[0].certificate_url);
-//     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//   }
-//   await pool.query("DELETE FROM internships WHERE id=$1", [id]);
-//   res.json({ message: "Internship deleted ✅" });
-// });
-
-// /* ========== CLUBS / ACTIVITIES MODULES ========== */
-// app.post("/activities", uploadImage("activities").single("image"), async (req, res) => {
-//   const { title, description, date } = req.body;
-//   const image_url = req.file ? `/activities/${req.file.filename}` : null;
-//   const result = await pool.query(
-//     "INSERT INTO activities(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
-//     [title, description, date, image_url]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.get("/activities", async (_, res) => {
-//   const result = await pool.query("SELECT * FROM activities ORDER BY date DESC");
-//   res.json(result.rows);
-// });
-
-// app.put("/activities/:id", uploadImage("activities").single("image"), async (req, res) => {
-//   const { id } = req.params;
-//   const { title, description, date } = req.body;
-
-//   let image_url = null;
-//   if (req.file) {
-//     image_url = `/activities/${req.file.filename}`;
-//     const old = await pool.query("SELECT image_url FROM activities WHERE id=$1", [id]);
-//     if (old.rows.length && old.rows[0].image_url) {
-//       const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-//       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//     }
-//   }
-
-//   const result = await pool.query(
-//     "UPDATE activities SET title=$1, description=$2, date=$3, image_url=COALESCE($4,image_url) WHERE id=$5 RETURNING *",
-//     [title, description, date, image_url, id]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.delete("/activities/:id", async (req, res) => {
-//   const { id } = req.params;
-//   const old = await pool.query("SELECT image_url FROM activities WHERE id=$1", [id]);
-//   if (old.rows.length && old.rows[0].image_url) {
-//     const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-//     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//   }
-//   await pool.query("DELETE FROM activities WHERE id=$1", [id]);
-//   res.json({ message: "Activity deleted ✅" });
-// });
-
-// /* ========== ACADEMIC HIGHLIGHTS MODULE ========== */
-// app.post("/highlights", uploadImage("highlights").single("image"), async (req, res) => {
-//   const { title, description } = req.body;
-//   const image_url = req.file ? `/highlights/${req.file.filename}` : null;
-//   const result = await pool.query(
-//     "INSERT INTO academic_highlights(title, description, image_url) VALUES($1,$2,$3) RETURNING *",
-//     [title, description, image_url]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.get("/highlights", async (_, res) => {
-//   const result = await pool.query("SELECT * FROM academic_highlights ORDER BY id DESC");
-//   res.json(result.rows);
-// });
-
-// app.put("/highlights/:id", uploadImage("highlights").single("image"), async (req, res) => {
-//   const { id } = req.params;
-//   const { title, description } = req.body;
-
-//   let image_url = null;
-//   if (req.file) {
-//     image_url = `/highlights/${req.file.filename}`;
-//     const old = await pool.query("SELECT image_url FROM academic_highlights WHERE id=$1", [id]);
-//     if (old.rows.length && old.rows[0].image_url) {
-//       const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-//       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//     }
-//   }
-
-//   const result = await pool.query(
-//     "UPDATE academic_highlights SET title=$1, description=$2, image_url=COALESCE($3,image_url) WHERE id=$4 RETURNING *",
-//     [title, description, image_url, id]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.delete("/highlights/:id", async (req, res) => {
-//   const { id } = req.params;
-//   const old = await pool.query("SELECT image_url FROM academic_highlights WHERE id=$1", [id]);
-//   if (old.rows.length && old.rows[0].image_url) {
-//     const oldPath = path.join(UPLOAD_DIR, old.rows[0].image_url);
-//     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//   }
-//   await pool.query("DELETE FROM academic_highlights WHERE id=$1", [id]);
-//   res.json({ message: "Highlight deleted ✅" });
-// });
 
 /* ================= HEALTH ================= */
 app.get("/health", async (_, res) => {
