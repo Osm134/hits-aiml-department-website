@@ -14,17 +14,22 @@ const mapCategory = {
 
 export default function ActivityCategory() {
   const { type } = useParams();
-  const [events, setEvents] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const BASE_URL = process.env.REACT_APP_API_URL;
 
-  const API = process.env.REACT_APP_API_URL;
-
-  const fetch = async () => {
-    const res = await axios.get(`${API}/api/activities`);
-    setEvents(res.data.filter((e) => e.category === mapCategory[type]));
+  const fetchActivities = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/api/deptactivities`);
+      const filtered = res.data.filter((a) => a.category === mapCategory[type]);
+      setActivities(filtered);
+    } catch (err) {
+      console.error("Failed to fetch dept activities:", err);
+      setActivities([]);
+    }
   };
 
   useEffect(() => {
-    fetch();
+    fetchActivities();
   }, [type]);
 
   return (
@@ -33,11 +38,20 @@ export default function ActivityCategory() {
         {mapCategory[type]}
       </h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {events.map((event) => (
-          <EventCard key={event.id} event={event} refresh={fetch} />
-        ))}
-      </div>
+      {activities.length === 0 ? (
+        <p className="text-gray-500 text-center">No activities in this category yet.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {activities.map((event) => (
+            <EventCard
+              key={event.id}
+              event={event}
+              refresh={fetchActivities}
+              BASE_URL={BASE_URL}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

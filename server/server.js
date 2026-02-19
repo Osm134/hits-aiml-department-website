@@ -35,79 +35,79 @@ pool.connect()
   
 /* ========== EVENTS MODULE ========== */
 const storage = new CloudinaryStorage({
-  cloudinary: cloudinary.v2,
+  cloudinary: cloud,
   params: {
-    folder: "department_activities",
+    folder: "dept_activities",
     allowed_formats: ["jpg", "jpeg", "png", "webp"],
   },
 });
 const upload = multer({ storage });
 
-// ================= ROUTES =================
 
-// GET all activities
-// GET all activities
-app.get("/api/activities", async (_, res) => {
+// ================= ROUTES =================
+// GET all dept activities
+app.get("/api/deptactivities", async (_, res) => {
   try {
-    const result = await pool.query("SELECT * FROM activities ORDER BY event_date DESC");
+    const result = await pool.query(
+      "SELECT * FROM deptactivities ORDER BY event_date DESC"
+    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error fetching activities" });
+    res.status(500).json({ message: "Server error fetching dept activities" });
   }
 });
 
-// CREATE activity
-app.post("/api/activities", upload.single("image"), async (req, res) => {
+// CREATE new activity
+app.post("/api/deptactivities", upload.single("image"), async (req, res) => {
   try {
     const { title, description, category, event_date } = req.body;
     const image_url = req.file ? req.file.path : null;
 
     const result = await pool.query(
-      `INSERT INTO activities(title, description, category, event_date, image_url)
-       VALUES($1, $2, $3, $4, $5) RETURNING *`,
+      `INSERT INTO deptactivities(title, description, category, event_date, image_url)
+       VALUES($1,$2,$3,$4,$5) RETURNING *`,
       [title, description, category, event_date, image_url]
     );
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error creating activity" });
+    res.status(500).json({ message: "Server error creating dept activity" });
   }
 });
 
 // UPDATE activity
-app.put("/api/activities/:id", upload.single("image"), async (req, res) => {
+app.put("/api/deptactivities/:id", upload.single("image"), async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, category, event_date } = req.body;
     const image_url = req.file ? req.file.path : null;
 
     const result = await pool.query(
-      `UPDATE activities
-       SET title=$1, description=$2, category=$3, event_date=$4, image_url=COALESCE($5, image_url)
+      `UPDATE deptactivities
+       SET title=$1, description=$2, category=$3, event_date=$4, image_url=COALESCE($5,image_url)
        WHERE id=$6 RETURNING *`,
       [title, description, category, event_date, image_url, id]
     );
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error updating activity" });
+    res.status(500).json({ message: "Server error updating dept activity" });
   }
 });
 
 // DELETE activity
-app.delete("/api/activities/:id", async (req, res) => {
+app.delete("/api/deptactivities/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    await pool.query("DELETE FROM activities WHERE id=$1", [id]);
-    res.json({ message: "Activity deleted ✅" });
+    await pool.query("DELETE FROM deptactivities WHERE id=$1", [id]);
+    res.json({ message: "Dept activity deleted ✅" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error deleting activity" });
+    res.status(500).json({ message: "Server error deleting dept activity" });
   }
 });
 
-  
 // ================= MULTER + CLOUDINARY STORAGE =================
 // ================= CLOUDINARY STORAGE HELPERS =================
 const createCloudinaryStorage = (folder) =>

@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import EventCard from "../components/EventCard";
 import ActivityModal from "../components/ActivityModal";
+import { useNavigate } from "react-router-dom";
 
 const categories = [
   { name: "Events", path: "events" },
@@ -17,14 +17,15 @@ export default function DepartmentActivities() {
   const [activities, setActivities] = useState([]);
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+
   const BASE_URL = process.env.REACT_APP_API_URL;
 
   const fetchActivities = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/activities`);
+      const res = await axios.get(`${BASE_URL}/api/deptactivities`);
       setActivities(res.data);
     } catch (err) {
-      console.error("Failed to fetch activities:", err);
+      console.error("Failed to fetch dept activities:", err);
       setActivities([]);
     }
   };
@@ -67,10 +68,10 @@ export default function DepartmentActivities() {
           <p className="text-gray-500 text-center">No activities yet. Add one above!</p>
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {activities.map((activity) => (
+            {activities.map((event) => (
               <EventCard
-                key={activity.id}
-                event={activity}
+                key={event.id}
+                event={event}
                 refresh={fetchActivities}
                 BASE_URL={BASE_URL}
               />

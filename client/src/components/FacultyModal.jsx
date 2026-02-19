@@ -1,11 +1,14 @@
+// src/components/FacultyModal.jsx
 import { useState, useEffect } from "react";
 import API from "../API";
 
 export default function FacultyModal({ isOpen, onClose, facultyData, refresh }) {
+  const defaultImage = "/faculty.jpg"; // fallback
   const [name, setName] = useState("");
   const [designation, setDesignation] = useState("");
   const [subject, setSubject] = useState("");
   const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState(defaultImage); // live preview
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -15,16 +18,30 @@ export default function FacultyModal({ isOpen, onClose, facultyData, refresh }) 
       setDesignation(facultyData.designation || "");
       setSubject(facultyData.subject || "");
       setImage(null);
+      setPreview(facultyData.image_url || defaultImage);
     } else {
       setName("");
       setDesignation("");
       setSubject("");
       setImage(null);
+      setPreview(defaultImage);
     }
     setError("");
   }, [facultyData]);
 
   if (!isOpen) return null;
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImage(file);
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
+
+    // Revoke object URL on cleanup to avoid memory leaks
+    return () => URL.revokeObjectURL(objectUrl);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,11 +68,16 @@ export default function FacultyModal({ isOpen, onClose, facultyData, refresh }) 
       refresh();
       onClose();
     } catch (err) {
-      console.error("Faculty save failed:", err);
+      console.error("Faculty save failed:", err.response?.data || err.message);
       setError("Failed to save faculty");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleImageError = (e) => {
+    console.error("Failed to load image:", e.target.src);
+    e.target.src = defaultImage;
   };
 
   return (
@@ -66,6 +88,16 @@ export default function FacultyModal({ isOpen, onClose, facultyData, refresh }) 
         </h2>
 
         {error && <p className="text-red-600 mb-2">{error}</p>}
+
+        {/* Live preview */}
+        <div className="flex justify-center mb-4">
+          <img
+            src={preview}
+            alt="Preview"
+            onError={handleImageError}
+            className="w-28 h-28 sm:w-36 sm:h-36 object-cover rounded-full border-4 border-gray-200"
+          />
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input
@@ -94,7 +126,7 @@ export default function FacultyModal({ isOpen, onClose, facultyData, refresh }) 
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => setImage(e.target.files[0])}
+            onChange={handleImageChange}
             className="border px-3 py-2 rounded"
           />
 
