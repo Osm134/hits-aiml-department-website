@@ -16,7 +16,7 @@ import ActivityCategory from "./pages/ActivityCategory";
 // Admin Route Protection
 const AdminRoute = ({ children }) => {
   const role = localStorage.getItem("role");
-  if (role !== "ADMIN") return <Navigate to="/login" />;
+  if (role !== "ADMIN") return <Navigate to="/login" replace />;
   return children;
 };
 
@@ -32,19 +32,17 @@ function AppWrapper() {
 
       <main className="flex-grow">
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Home />} />
-
-          {/* Department Activities Main Page */}
-          <Route path="/activities" element={<DepartmentActivities />} />
-
-          {/* Department Activities Category Pages */}
-          <Route path="/activities/:type" element={<ActivityCategory />} />
-
           <Route path="/faculty" element={<Faculty />} />
           <Route path="/students" element={<Students />} />
           <Route path="/academics" element={<Academics />} />
           <Route path="/daily-updates" element={<DailyUpdatesPage />} />
           <Route path="/login" element={<Login />} />
+
+          {/* Department Activities */}
+          <Route path="/activities" element={<DepartmentActivities />} />
+          <Route path="/activities/:type" element={<ActivityCategory />} />
 
           {/* Admin Routes */}
           <Route

@@ -1,48 +1,53 @@
 import { useState } from "react";
 import axios from "axios";
 
-export default function EventForm({ onClose }) {
+export default function EventForm({ onClose, refresh }) {
   const [form, setForm] = useState({
     title: "",
-    category: "Events",
     description: "",
+    category: "Events",
     event_date: "",
   });
   const [image, setImage] = useState(null);
+  const BASE_URL = process.env.REACT_APP_API_URL;
 
   const submit = async (e) => {
     e.preventDefault();
+    try {
+      const data = new FormData();
+      Object.entries(form).forEach(([key, value]) => data.append(key, value));
+      if (image) data.append("image", image);
 
-    const data = new FormData();
-    Object.entries(form).forEach(([k, v]) => data.append(k, v));
-    if (image) data.append("image", image);
-
-    await axios.post(`${process.env.REACT_APP_API_URL}/api/activities`, data);
-
-    onClose(); // Close modal after submitting
+      await axios.post(`${BASE_URL}/api/activities`, data);
+      refresh();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save activity");
+    }
   };
 
   return (
     <form onSubmit={submit} className="space-y-4">
       <input
         placeholder="Title"
-        className="border p-2 w-full rounded-lg"
         required
+        className="border p-2 w-full rounded-lg"
         onChange={(e) => setForm({ ...form, title: e.target.value })}
       />
 
       <textarea
         placeholder="Description"
-        className="border p-2 w-full rounded-lg"
         required
         rows={4}
+        className="border p-2 w-full rounded-lg"
         onChange={(e) => setForm({ ...form, description: e.target.value })}
       />
 
       <select
         className="border p-2 w-full rounded-lg"
-        onChange={(e) => setForm({ ...form, category: e.target.value })}
         defaultValue="Events"
+        onChange={(e) => setForm({ ...form, category: e.target.value })}
       >
         <option>Events</option>
         <option>Workshops</option>
@@ -54,9 +59,9 @@ export default function EventForm({ onClose }) {
 
       <input
         type="date"
+        required
         className="border p-2 w-full rounded-lg"
         onChange={(e) => setForm({ ...form, event_date: e.target.value })}
-        required
       />
 
       <input
