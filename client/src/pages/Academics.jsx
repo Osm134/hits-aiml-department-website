@@ -9,11 +9,12 @@ export default function Academics() {
   const [activeType, setActiveType] = useState("notes");
   const [openSem, setOpenSem] = useState(null);
   const [uploadInfo, setUploadInfo] = useState(null);
+  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef();
 
   const API = process.env.REACT_APP_API_URL;
 
-  // Fetch
+  // ================= FETCH DATA =================
   const fetchData = async () => {
     try {
       const res = await fetch(`${API}/academics`);
@@ -21,28 +22,32 @@ export default function Academics() {
       setData(json);
     } catch (err) {
       console.error(err);
-      alert("Failed to fetch data");
+      alert("Failed to fetch academics data");
     }
   };
 
   useEffect(() => fetchData(), []);
 
-  // Delete
+  // ================= DELETE =================
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this file?")) return;
     try {
-      await fetch(`${API}/academics/${id}`, { method: "DELETE" });
+      setLoading(true);
+      const res = await fetch(`${API}/academics/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
       fetchData();
     } catch (err) {
       console.error(err);
       alert("Delete failed");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Upload
+  // ================= UPLOAD =================
   const startUpload = (semester) => {
-    const title = prompt("Enter title");
-    const subject = prompt("Enter subject");
+    const title = prompt("Enter title for the document:");
+    const subject = prompt("Enter subject:");
     if (!title || !subject) return;
     setUploadInfo({ semester, title, subject });
     fileInputRef.current.click();
@@ -51,7 +56,7 @@ export default function Academics() {
   const handleFileChange = async (e) => {
     if (!uploadInfo) return;
     const file = e.target.files[0];
-    if (!file) return alert("Select a PDF file");
+    if (!file) return alert("Please select a PDF file");
 
     const formData = new FormData();
     formData.append("title", uploadInfo.title);
@@ -61,6 +66,7 @@ export default function Academics() {
     formData.append("file", file);
 
     try {
+      setLoading(true);
       const res = await fetch(`${API}/academics`, { method: "POST", body: formData });
       if (!res.ok) throw new Error();
       setUploadInfo(null);
@@ -68,6 +74,8 @@ export default function Academics() {
     } catch (err) {
       console.error(err);
       alert("Upload failed");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -115,7 +123,10 @@ export default function Academics() {
                 <div className="flex justify-end mb-4">
                   <button
                     onClick={() => startUpload(sem)}
-                    className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
+                    disabled={loading}
+                    className={`flex items-center gap-2 px-4 py-2 rounded ${
+                      loading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 text-white"
+                    }`}
                   >
                     <FiUpload /> Upload
                   </button>
@@ -128,13 +139,26 @@ export default function Academics() {
                         <p className="font-semibold">{item.title}</p>
                         <small className="text-gray-500">Subject: {item.subject}</small>
                         <div className="flex gap-2 mt-2">
-                          <a href={item.file_url} target="_blank" rel="noreferrer" className="bg-blue-600 text-white p-2 rounded">
+                          <a
+                            href={item.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-blue-600 text-white p-2 rounded flex items-center justify-center"
+                          >
                             <FiEye />
                           </a>
-                          <a href={item.file_url} download className="bg-green-600 text-white p-2 rounded">
+                          <a
+                            href={item.file_url}
+                            download
+                            className="bg-green-600 text-white p-2 rounded flex items-center justify-center"
+                          >
                             <FiDownload />
                           </a>
-                          <button onClick={() => handleDelete(item.id)} className="bg-red-600 text-white p-2 rounded">
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            disabled={loading}
+                            className={`p-2 rounded ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-red-600 text-white"}`}
+                          >
                             <FiTrash2 />
                           </button>
                         </div>
@@ -142,7 +166,7 @@ export default function Academics() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-gray-400">No files uploaded.</p>
+                  <p className="text-center text-gray-400">No files uploaded for this semester.</p>
                 )}
               </div>
             )}
