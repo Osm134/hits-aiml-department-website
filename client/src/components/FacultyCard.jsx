@@ -1,5 +1,11 @@
+// src/components/FacultyCard.jsx
 export default function FacultyCard({ faculty, onEdit, onDelete }) {
   const defaultImage = "/faculty.jpg"; // fallback image
+
+  const handleImageError = (e) => {
+    console.error("Failed to load image:", e.target.src);
+    e.target.src = defaultImage;
+  };
 
   return (
     <div className="bg-white border rounded-lg shadow hover:shadow-lg transition p-4 sm:p-6 flex flex-col items-center">
@@ -9,7 +15,7 @@ export default function FacultyCard({ faculty, onEdit, onDelete }) {
           src={faculty.image_url || defaultImage}
           alt={faculty.name}
           className="w-full h-full object-cover rounded-full border-4 border-gray-200"
-          onError={(e) => (e.target.src = defaultImage)}
+          onError={handleImageError}
         />
       </div>
 

@@ -1,7 +1,8 @@
+// src/pages/Faculty.jsx
 import { useState, useEffect, useCallback } from "react";
 import API from "../API";
-import FacultyCard from "./FacultyCard";
-import FacultyModal from "./FacultyModal";
+import FacultyCard from "../components/FacultyCard";
+import FacultyModal from "../components/FacultyModal";
 
 export default function Faculty() {
   const [facultyList, setFacultyList] = useState([]);
@@ -15,9 +16,10 @@ export default function Faculty() {
     setError("");
     try {
       const res = await API.get("/faculty");
+      console.log("Faculty API data:", res.data); // 🔍 check URLs
       setFacultyList(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error("Fetch faculty failed:", err);
+      console.error("Fetch faculty failed:", err.response?.data || err.message);
       setError("Failed to load faculty list");
       setFacultyList([]);
     } finally {
@@ -48,7 +50,7 @@ export default function Faculty() {
     try {
       await API.delete(`/faculty/${id}`);
     } catch (err) {
-      console.error(err);
+      console.error("Delete failed:", err.response?.data || err.message);
       alert("Delete failed. Restoring data.");
       setFacultyList(backup);
     }
