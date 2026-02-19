@@ -1,94 +1,80 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import API from "../API";
-import FacultyCard from "../components/FacultyCard";
-import FacultyModal from "../components/FacultyModal";
+import FacultyCard from "./FacultyCard";
+import FacultyModal from "./FacultyModal";
 
-export default function Faculty() {
+export default function FacultyList() {
   const [facultyList, setFacultyList] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editFaculty, setEditFaculty] = useState(null);
-  const [error, setError] = useState("");
+  const [selectedFaculty, setSelectedFaculty] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const fetchFaculty = useCallback(async () => {
+  // Fetch faculty from backend
+  const fetchFaculty = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await API.get("/faculty");
-      setFacultyList(Array.isArray(res.data) ? res.data : []);
+      setFacultyList(res.data);
     } catch (err) {
-      console.error("Fetch faculty failed:", err);
-      setError("Failed to load faculty list");
-      setFacultyList([]);
+      console.error("Failed to fetch faculty:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     fetchFaculty();
-  }, [fetchFaculty]);
+  }, []);
 
-  const openAddModal = () => {
-    setEditFaculty(null);
+  // Open modal for edit
+  const handleEdit = (faculty) => {
+    setSelectedFaculty(faculty);
     setModalOpen(true);
   };
 
-  const openEditModal = (faculty) => {
-    setEditFaculty(faculty);
-    setModalOpen(true);
-  };
-
+  // Delete faculty
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this faculty?")) return;
-
-    const backup = [...facultyList];
-    setFacultyList((prev) => prev.filter((f) => f.id !== id));
-
     try {
       await API.delete(`/faculty/${id}`);
+      fetchFaculty();
     } catch (err) {
-      console.error(err);
-      alert("Delete failed. Restoring data.");
-      setFacultyList(backup);
+      console.error("Failed to delete faculty:", err);
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-5 gap-3">
-        <h1 className="text-2xl sm:text-3xl font-bold">Faculty</h1>
+    <div className="p-4 sm:p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Faculty List</h1>
         <button
-          onClick={openAddModal}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          onClick={() => { setSelectedFaculty(null); setModalOpen(true); }}
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
         >
           Add Faculty
         </button>
       </div>
 
       {loading ? (
-        <p className="text-center text-gray-500">Loading faculty...</p>
-      ) : error ? (
-        <p className="text-center text-red-600">{error}</p>
-      ) : !facultyList.length ? (
-        <p className="text-center text-gray-500">No faculty available.</p>
+        <p>Loading faculty...</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {facultyList.map((f) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {facultyList.map((faculty) => (
             <FacultyCard
-              key={f.id}
-              faculty={f}
-              onEdit={() => openEditModal(f)}
-              onDelete={() => handleDelete(f.id)}
+              key={faculty.id}
+              faculty={faculty}
+              onEdit={() => handleEdit(faculty)}
+              onDelete={() => handleDelete(faculty.id)}
             />
           ))}
         </div>
       )}
 
+      {/* Modal */}
       <FacultyModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        facultyData={editFaculty}
+        facultyData={selectedFaculty}
         refresh={fetchFaculty}
       />
     </div>
