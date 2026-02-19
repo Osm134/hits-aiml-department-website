@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import API from "../API";
 import EventCard from "../components/EventCard";
 import ActivityModal from "../components/ActivityModal";
-import { useNavigate } from "react-router-dom";
 
 const categories = [
   { name: "Events", path: "events" },
@@ -15,24 +15,53 @@ const categories = [
 
 export default function DepartmentActivities() {
   const [activities, setActivities] = useState([]);
-  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editActivity, setEditActivity] = useState(null);
+
   const navigate = useNavigate();
 
-  const BASE_URL = process.env.REACT_APP_API_URL;
-
-  const fetchActivities = async () => {
+  const fetchActivities = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await axios.get(`${BASE_URL}/api/deptactivities`);
-      setActivities(res.data);
+      const res = await API.get("/api/deptactivities");
+      setActivities(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error("Failed to fetch dept activities:", err);
+      console.error("Failed to fetch activities:", err.response?.data || err.message);
       setActivities([]);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchActivities();
-  }, []);
+  }, [fetchActivities]);
+
+  const openAddModal = () => {
+    setEditActivity(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (activity) => {
+    setEditActivity(activity);
+    setModalOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this activity?")) return;
+
+    const backup = [...activities];
+    setActivities((prev) => prev.filter((a) => a.id !== id));
+
+    try {
+      await API.delete(`/api/deptactivities/${id}`);
+    } catch (err) {
+      console.error("Delete failed:", err.response?.data || err.message);
+      alert("Delete failed. Restoring data.");
+      setActivities(backup);
+    }
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -41,7 +70,7 @@ export default function DepartmentActivities() {
         <h1 className="text-4xl font-bold">Department Activities – AIML</h1>
         <p className="mt-2 text-lg">Explore • Learn • Innovate</p>
         <button
-          onClick={() => setOpen(true)}
+          onClick={openAddModal}
           className="mt-6 bg-white text-blue-700 px-6 py-2 rounded-full font-semibold hover:scale-105 transition"
         >
           + Add Activity
@@ -62,25 +91,32 @@ export default function DepartmentActivities() {
         ))}
       </div>
 
-      {/* ACTIVITIES */}
+      {/* ACTIVITIES GRID */}
       <div className="max-w-6xl mx-auto p-8">
-        {activities.length === 0 ? (
-          <p className="text-gray-500 text-center">No activities yet. Add one above!</p>
+        {loading ? (
+          <p className="text-center text-gray-500">Loading activities...</p>
+        ) : !activities.length ? (
+          <p className="text-center text-gray-500">No activities yet. Add one above!</p>
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
             {activities.map((event) => (
               <EventCard
                 key={event.id}
                 event={event}
-                refresh={fetchActivities}
-                BASE_URL={BASE_URL}
+                onEdit={() => openEditModal(event)}
+                onDelete={() => handleDelete(event.id)}
               />
             ))}
           </div>
         )}
       </div>
 
-      <ActivityModal open={open} onClose={() => setOpen(false)} refresh={fetchActivities} />
+      <ActivityModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        activityData={editActivity}
+        refresh={fetchActivities}
+      />
     </div>
   );
 }

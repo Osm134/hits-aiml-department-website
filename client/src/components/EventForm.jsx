@@ -1,53 +1,75 @@
-import { useState } from "react";
-import axios from "axios";
+import React, { useState, useEffect } from "react";
 
-export default function EventForm({ onClose, refresh }) {
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    category: "Events",
-    event_date: "",
-  });
+export default function EventForm({ initialData, onSubmit, onCancel, loading }) {
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("Events");
+  const [description, setDescription] = useState("");
+  const [eventDate, setEventDate] = useState("");
   const [image, setImage] = useState(null);
-  const BASE_URL = process.env.REACT_APP_API_URL;
+  const [preview, setPreview] = useState("/placeholder.png");
 
-  const submit = async (e) => {
-    e.preventDefault();
-    try {
-      const data = new FormData();
-      Object.entries(form).forEach(([key, value]) => data.append(key, value));
-      if (image) data.append("image", image);
-
-      await axios.post(`${BASE_URL}/api/activities`, data);
-      refresh();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to save activity");
+  useEffect(() => {
+    if (initialData) {
+      setTitle(initialData.title || "");
+      setCategory(initialData.category || "Events");
+      setDescription(initialData.description || "");
+      setEventDate(initialData.event_date || "");
+      setImage(null);
+      setPreview(initialData.image_url || "/placeholder.png");
+    } else {
+      setTitle("");
+      setCategory("Events");
+      setDescription("");
+      setEventDate("");
+      setImage(null);
+      setPreview("/placeholder.png");
     }
+  }, [initialData]);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImage(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("category", category);
+    formData.append("description", description);
+    formData.append("event_date", eventDate);
+    if (image) formData.append("image", image);
+
+    onSubmit(formData);
   };
 
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <input
-        placeholder="Title"
-        required
-        className="border p-2 w-full rounded-lg"
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
-      />
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <div className="flex justify-center mb-4">
+        <img
+          src={preview}
+          alt="Preview"
+          className="w-28 h-28 sm:w-36 sm:h-36 object-cover rounded-lg border-2 border-gray-200"
+        />
+      </div>
 
-      <textarea
-        placeholder="Description"
+      <input
+        type="text"
+        placeholder="Title"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
         required
-        rows={4}
-        className="border p-2 w-full rounded-lg"
-        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        className="border px-3 py-2 rounded"
       />
 
       <select
-        className="border p-2 w-full rounded-lg"
-        defaultValue="Events"
-        onChange={(e) => setForm({ ...form, category: e.target.value })}
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        className="border px-3 py-2 rounded"
       >
         <option>Events</option>
         <option>Workshops</option>
@@ -59,20 +81,41 @@ export default function EventForm({ onClose, refresh }) {
 
       <input
         type="date"
-        required
-        className="border p-2 w-full rounded-lg"
-        onChange={(e) => setForm({ ...form, event_date: e.target.value })}
+        value={eventDate}
+        onChange={(e) => setEventDate(e.target.value)}
+        className="border px-3 py-2 rounded"
+      />
+
+      <textarea
+        placeholder="Description"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        className="border px-3 py-2 rounded"
       />
 
       <input
         type="file"
-        className="w-full"
-        onChange={(e) => setImage(e.target.files[0])}
+        accept="image/*"
+        onChange={handleImageChange}
+        className="border px-3 py-2 rounded"
       />
 
-      <button className="w-full bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800 transition">
-        Save Activity
-      </button>
+      <div className="flex justify-end gap-2 mt-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          {loading ? "Saving..." : "Save"}
+        </button>
+      </div>
     </form>
   );
 }

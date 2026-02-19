@@ -34,14 +34,16 @@ pool.connect()
 
   
 /* ========== EVENTS MODULE ========== */
-const storage = new CloudinaryStorage({
+const activityStorage = new CloudinaryStorage({
   cloudinary: cloud,
   params: {
     folder: "dept_activities",
     allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    transformation: [{ width: 800, height: 800, crop: "limit" }],
   },
 });
-const upload = multer({ storage });
+
+const uploadActivityImage = multer({ storage: activityStorage });
 
 
 // ================= ROUTES =================
@@ -57,13 +59,11 @@ app.get("/api/deptactivities", async (_, res) => {
     res.status(500).json({ message: "Server error fetching dept activities" });
   }
 });
-
-// CREATE new activity
-app.post("/api/deptactivities", upload.single("image"), async (req, res) => {
+// CREATE activity
+app.post("/api/deptactivities", uploadActivityImage.single("image"), async (req, res) => {
   try {
     const { title, description, category, event_date } = req.body;
-    const image_url = req.file ? req.file.path : null;
-
+    const image_url = req.file?.path || null;
     const result = await pool.query(
       `INSERT INTO deptactivities(title, description, category, event_date, image_url)
        VALUES($1,$2,$3,$4,$5) RETURNING *`,
@@ -77,11 +77,20 @@ app.post("/api/deptactivities", upload.single("image"), async (req, res) => {
 });
 
 // UPDATE activity
-app.put("/api/deptactivities/:id", upload.single("image"), async (req, res) => {
+app.put("/api/deptactivities/:id", uploadActivityImage.single("image"), async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, category, event_date } = req.body;
-    const image_url = req.file ? req.file.path : null;
+    let image_url = req.file?.path || null;
+
+    // delete old image if new one uploaded
+    if (req.file) {
+      const old = await pool.query("SELECT image_url FROM deptactivities WHERE id=$1", [id]);
+      if (old.rows[0]?.image_url) {
+        const publicId = old.rows[0].image_url.split("/").slice(-1)[0].split(".")[0];
+        await cloud.uploader.destroy(`dept_activities/${publicId}`);
+      }
+    }
 
     const result = await pool.query(
       `UPDATE deptactivities
@@ -89,6 +98,7 @@ app.put("/api/deptactivities/:id", upload.single("image"), async (req, res) => {
        WHERE id=$6 RETURNING *`,
       [title, description, category, event_date, image_url, id]
     );
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -100,6 +110,11 @@ app.put("/api/deptactivities/:id", upload.single("image"), async (req, res) => {
 app.delete("/api/deptactivities/:id", async (req, res) => {
   try {
     const { id } = req.params;
+    const old = await pool.query("SELECT image_url FROM deptactivities WHERE id=$1", [id]);
+    if (old.rows[0]?.image_url) {
+      const publicId = old.rows[0].image_url.split("/").slice(-1)[0].split(".")[0];
+      await cloud.uploader.destroy(`dept_activities/${publicId}`);
+    }
     await pool.query("DELETE FROM deptactivities WHERE id=$1", [id]);
     res.json({ message: "Dept activity deleted ✅" });
   } catch (err) {
@@ -107,6 +122,7 @@ app.delete("/api/deptactivities/:id", async (req, res) => {
     res.status(500).json({ message: "Server error deleting dept activity" });
   }
 });
+
 
 // ================= MULTER + CLOUDINARY STORAGE =================
 // ================= CLOUDINARY STORAGE HELPERS =================

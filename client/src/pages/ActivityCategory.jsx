@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import axios from "axios";
+import API from "../API";
 import EventCard from "../components/EventCard";
 
 const mapCategory = {
@@ -15,22 +15,25 @@ const mapCategory = {
 export default function ActivityCategory() {
   const { type } = useParams();
   const [activities, setActivities] = useState([]);
-  const BASE_URL = process.env.REACT_APP_API_URL;
+  const [loading, setLoading] = useState(true);
 
-  const fetchActivities = async () => {
+  const fetchActivities = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await axios.get(`${BASE_URL}/api/deptactivities`);
+      const res = await API.get("/api/deptactivities");
       const filtered = res.data.filter((a) => a.category === mapCategory[type]);
       setActivities(filtered);
     } catch (err) {
-      console.error("Failed to fetch dept activities:", err);
+      console.error("Failed to fetch activities:", err.response?.data || err.message);
       setActivities([]);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [type]);
 
   useEffect(() => {
     fetchActivities();
-  }, [type]);
+  }, [fetchActivities]);
 
   return (
     <div className="p-6 md:p-8 bg-gray-50 min-h-screen">
@@ -38,8 +41,10 @@ export default function ActivityCategory() {
         {mapCategory[type]}
       </h1>
 
-      {activities.length === 0 ? (
-        <p className="text-gray-500 text-center">No activities in this category yet.</p>
+      {loading ? (
+        <p className="text-center text-gray-500">Loading...</p>
+      ) : !activities.length ? (
+        <p className="text-center text-gray-500">No activities in this category yet.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {activities.map((event) => (
@@ -47,7 +52,6 @@ export default function ActivityCategory() {
               key={event.id}
               event={event}
               refresh={fetchActivities}
-              BASE_URL={BASE_URL}
             />
           ))}
         </div>
