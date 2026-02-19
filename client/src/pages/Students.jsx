@@ -269,7 +269,7 @@ export default function Students() {
         )}
 
         {/* INTERNSHIPS TAB */}
-        {activeTab === "internships" && <Internship internships={internships} />}
+        {activeTab === "internships" && <Internship internshipsProp={internships} />}
 
         {/* STUDENTS TAB */}
         {activeTab === "students" && (
