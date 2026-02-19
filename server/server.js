@@ -36,9 +36,95 @@ pool.connect()
 
 
 
+// Multer + Cloudinary storage for event images
+const eventImageStorage = new CloudinaryStorage({
+  cloudinary: cloud,
+  params: {
+    folder: "event_images",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    transformation: [{ width: 800, height: 800, crop: "limit" }],
+  },
+});
+
+const uploadEventImage = multer({ storage: eventImageStorage });
 
 
 
+// GET all images for a specific event
+app.get("/event-images/:event_id", async (req, res) => {
+  try {
+    const { event_id } = req.params;
+    const result = await pool.query(
+      "SELECT * FROM event_images WHERE event_id=$1 ORDER BY created_at DESC",
+      [event_id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch event images" });
+  }
+});
+
+// ADD an image for an event
+app.post("/event-images", uploadEventImage.single("image"), async (req, res) => {
+  try {
+    const { event_id } = req.body;
+    if (!req.file) return res.status(400).json({ message: "No image uploaded" });
+
+    const image_url = req.file.path;
+
+    const result = await pool.query(
+      "INSERT INTO event_images(event_id, image_url) VALUES($1, $2) RETURNING *",
+      [event_id, image_url]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to upload image" });
+  }
+});
+
+// DELETE an image
+app.delete("/event-images/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get old image URL
+    const old = await pool.query("SELECT image_url FROM event_images WHERE id=$1", [id]);
+    if (old.rows[0]?.image_url) {
+      const publicId = old.rows[0].image_url.split("/").slice(-1)[0].split(".")[0];
+      await cloud.uploader.destroy(`event_images/${publicId}`);
+    }
+
+    // Delete from DB
+    await pool.query("DELETE FROM event_images WHERE id=$1", [id]);
+    res.json({ message: "Event image deleted ✅" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to delete image" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
 // ---------------- CLOUDINARY STORAGE ----------------
 
 // Multer + Cloudinary Storage
