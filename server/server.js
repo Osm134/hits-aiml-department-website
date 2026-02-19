@@ -18,11 +18,8 @@ app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
 
 // ================= CLOUDINARY CONFIG =================
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// Using CLOUDINARY_URL from environment
+cloudinary.v2.config(); // automatically reads CLOUDINARY_URL
 
 // ================= DATABASE =================
 const pool = new Pool({
@@ -36,7 +33,7 @@ pool.connect()
 
 // ================= MULTER + CLOUDINARY =================
 const facultyStorage = new CloudinaryStorage({
-  cloudinary,
+  cloudinary: cloudinary.v2, // use v2
   params: {
     folder: "faculty",
     allowed_formats: ["jpg", "jpeg", "png"],
@@ -55,9 +52,7 @@ const uploadFacultyImage = multer({
 app.post("/faculty", uploadFacultyImage.single("image"), async (req, res) => {
   try {
     const { name, designation, subject } = req.body;
-    const image_url = req.file?.path || null;
-
-    console.log("☁️ Cloudinary Upload Success:", { image_url });
+    const image_url = req.file ? req.file.path : null;
 
     const result = await pool.query(
       `INSERT INTO faculty (name, designation, subject, image_url)
@@ -99,16 +94,10 @@ app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => 
       // Delete old image if exists
       const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
       if (old.rows[0]?.image_url) {
-        // Extract public_id from URL
-        const publicId = old.rows[0].image_url
-          .split("/")
-          .slice(-1)[0]
-          .split(".")[0];
-        await cloudinary.uploader.destroy(`faculty/${publicId}`);
-        console.log("🗑️ Old Cloudinary image deleted");
+        const publicId = old.rows[0].image_url.split("/").slice(-1)[0].split(".")[0];
+        await cloudinary.v2.uploader.destroy(`faculty/${publicId}`);
       }
       image_url = req.file.path;
-      console.log("☁️ New image uploaded:", image_url);
     }
 
     const result = await pool.query(
@@ -136,16 +125,10 @@ app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => 
 app.delete("/faculty/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
     const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
     if (old.rows[0]?.image_url) {
-      // Extract public_id from URL
-      const publicId = old.rows[0].image_url
-        .split("/")
-        .slice(-1)[0]
-        .split(".")[0];
-      await cloudinary.uploader.destroy(`faculty/${publicId}`);
-      console.log("🗑️ Cloudinary image deleted");
+      const publicId = old.rows[0].image_url.split("/").slice(-1)[0].split(".")[0];
+      await cloudinary.v2.uploader.destroy(`faculty/${publicId}`);
     }
 
     await pool.query("DELETE FROM faculty WHERE id=$1", [id]);
@@ -156,7 +139,9 @@ app.delete("/faculty/:id", async (req, res) => {
   }
 });
 
-
+app.listen(port, () => {
+  console.log(`✅ Server running on port ${port}`);
+});
 
 // /* ================= DAILY UPDATES ================= */
 // app.post("/updates", async (req, res) => {
