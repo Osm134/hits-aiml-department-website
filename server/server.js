@@ -16,10 +16,10 @@ const port = process.env.PORT || 5000;
 // ================= MIDDLEWARE =================
 app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
-
 // ================= CLOUDINARY CONFIG =================
-// Using CLOUDINARY_URL from environment
-cloudinary.v2.config(); // automatically reads CLOUDINARY_URL
+// Use CLOUDINARY_URL from .env automatically
+cloudinary.v2.config();
+const cloud = cloudinary.v2;
 
 // ================= DATABASE =================
 const pool = new Pool({
@@ -29,11 +29,11 @@ const pool = new Pool({
 
 pool.connect()
   .then(() => console.log("✅ PostgreSQL Connected"))
-  .catch(err => console.error("❌ PostgreSQL Error:", err));
+  .catch((err) => console.error("❌ PostgreSQL Connection Error:", err));
 
 // ================= MULTER + CLOUDINARY =================
 const facultyStorage = new CloudinaryStorage({
-  cloudinary: cloudinary.v2, // use v2
+  cloudinary: cloud,
   params: {
     folder: "faculty",
     allowed_formats: ["jpg", "jpeg", "png"],
@@ -43,7 +43,7 @@ const facultyStorage = new CloudinaryStorage({
 
 const uploadFacultyImage = multer({
   storage: facultyStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
 // ================= FACULTY MODULE =================
@@ -53,6 +53,8 @@ app.post("/faculty", uploadFacultyImage.single("image"), async (req, res) => {
   try {
     const { name, designation, subject } = req.body;
     const image_url = req.file ? req.file.path : null;
+
+    console.log("☁️ Cloudinary Upload Success:", image_url);
 
     const result = await pool.query(
       `INSERT INTO faculty (name, designation, subject, image_url)
@@ -66,19 +68,19 @@ app.post("/faculty", uploadFacultyImage.single("image"), async (req, res) => {
       data: result.rows[0],
     });
   } catch (err) {
-    console.error("❌ Faculty create failed:", err);
-    res.status(500).json({ message: "Failed to add faculty" });
+    console.error("❌ Error in /faculty POST:", err);
+    res.status(500).json({ message: "Failed to add faculty", error: err.message });
   }
 });
 
-// READ Faculty (all)
+// READ Faculty
 app.get("/faculty", async (_, res) => {
   try {
     const result = await pool.query("SELECT * FROM faculty ORDER BY name");
     res.json(result.rows);
   } catch (err) {
-    console.error("❌ Failed to fetch faculty:", err);
-    res.status(500).json({ message: "Failed to fetch faculty" });
+    console.error("❌ Error in /faculty GET:", err);
+    res.status(500).json({ message: "Failed to fetch faculty", error: err.message });
   }
 });
 
@@ -91,13 +93,18 @@ app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => 
     let image_url = null;
 
     if (req.file) {
-      // Delete old image if exists
       const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
       if (old.rows[0]?.image_url) {
         const publicId = old.rows[0].image_url.split("/").slice(-1)[0].split(".")[0];
-        await cloudinary.v2.uploader.destroy(`faculty/${publicId}`);
+        try {
+          await cloud.uploader.destroy(`faculty/${publicId}`);
+          console.log(`🗑️ Old Cloudinary image deleted: faculty/${publicId}`);
+        } catch (err) {
+          console.error("❌ Cloudinary delete failed (update):", err);
+        }
       }
       image_url = req.file.path;
+      console.log("☁️ New Cloudinary image uploaded:", image_url);
     }
 
     const result = await pool.query(
@@ -116,8 +123,8 @@ app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => 
       data: result.rows[0],
     });
   } catch (err) {
-    console.error("❌ Faculty update failed:", err);
-    res.status(500).json({ message: "Failed to update faculty" });
+    console.error("❌ Error in /faculty PUT:", err);
+    res.status(500).json({ message: "Failed to update faculty", error: err.message });
   }
 });
 
@@ -126,19 +133,26 @@ app.delete("/faculty/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
+
     if (old.rows[0]?.image_url) {
       const publicId = old.rows[0].image_url.split("/").slice(-1)[0].split(".")[0];
-      await cloudinary.v2.uploader.destroy(`faculty/${publicId}`);
+      try {
+        await cloud.uploader.destroy(`faculty/${publicId}`);
+        console.log(`🗑️ Cloudinary image deleted: faculty/${publicId}`);
+      } catch (err) {
+        console.error("❌ Cloudinary delete failed (delete route):", err);
+      }
     }
 
     await pool.query("DELETE FROM faculty WHERE id=$1", [id]);
     res.json({ message: "Faculty deleted successfully ✅" });
   } catch (err) {
-    console.error("❌ Faculty delete failed:", err);
-    res.status(500).json({ message: "Failed to delete faculty" });
+    console.error("❌ Error in /faculty DELETE:", err);
+    res.status(500).json({ message: "Failed to delete faculty", error: err.message });
   }
 });
 
+// Start server
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
 });
