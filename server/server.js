@@ -34,7 +34,7 @@ pool.connect()
   .then(() => console.log("✅ PostgreSQL Connected"))
   .catch(err => console.error("❌ PostgreSQL Error:", err));
 
-// ================= MULTER (CLOUDINARY) =================
+// ================= MULTER + CLOUDINARY =================
 const facultyStorage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -46,145 +46,68 @@ const facultyStorage = new CloudinaryStorage({
 
 const uploadFacultyImage = multer({
   storage: facultyStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
-
-
-// ================= AUTH =================
-app.post("/register", async (req, res) => {
-  try {
-    const { name, email, password, role } = req.body;
-
-    const exists = await pool.query(
-      "SELECT id FROM users WHERE email=$1",
-      [email]
-    );
-    if (exists.rows.length)
-      return res.status(400).json({ message: "User already exists" });
-
-    const hashed = await bcrypt.hash(password, 10);
-
-    const result = await pool.query(
-      `INSERT INTO users(name,email,password,role)
-       VALUES($1,$2,$3,$4)
-       RETURNING id,name,email,role`,
-      [name, email, hashed, role]
-    );
-
-    res.json({ message: "Registered ✅", user: result.rows[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Registration failed" });
-  }
-});
-
-app.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const result = await pool.query(
-      "SELECT * FROM users WHERE email=$1",
-      [email]
-    );
-    if (!result.rows.length)
-      return res.status(401).json({ message: "User not found" });
-
-    const user = result.rows[0];
-    const match = await bcrypt.compare(password, user.password);
-    if (!match)
-      return res.status(401).json({ message: "Wrong password" });
-
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" }
-    );
-
-    res.json({ token, user });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Login failed" });
-  }
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
 });
 
 // ================= FACULTY MODULE =================
 
-// CREATE
-// ================= FACULTY MODULE =================
-
-// CREATE
+// CREATE Faculty
 app.post("/faculty", uploadFacultyImage.single("image"), async (req, res) => {
   try {
-    const { name, designation, subject, email } = req.body;
-
-    // 🔧 FIX HERE: use public_id instead of filename
+    const { name, designation, subject } = req.body;
     const image_url = req.file?.path || null;
-    const image_public_id = req.file?.public_id || null;
 
-    console.log("☁️ Cloudinary Upload Success:", {
-      image_url,
-      image_public_id
-    });
+    console.log("☁️ Cloudinary Upload Success:", { image_url });
 
     const result = await pool.query(
-      `INSERT INTO faculty
-       (name, designation, subject, email, image_url, image_public_id)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO faculty (name, designation, subject, image_url)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [name, designation, subject, email, image_url, image_public_id]
+      [name, designation, subject, image_url]
     );
 
     res.status(201).json({
       message: "Faculty added successfully ✅",
-      data: result.rows[0]
+      data: result.rows[0],
     });
-
   } catch (err) {
     console.error("❌ Faculty create failed:", err);
     res.status(500).json({ message: "Failed to add faculty" });
   }
 });
 
-
-// READ
+// READ Faculty (all)
 app.get("/faculty", async (_, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM faculty ORDER BY name"
-    );
+    const result = await pool.query("SELECT * FROM faculty ORDER BY name");
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    console.error("❌ Failed to fetch faculty:", err);
     res.status(500).json({ message: "Failed to fetch faculty" });
   }
 });
 
-// UPDATE
-// UPDATE
+// UPDATE Faculty
 app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, designation, subject, email } = req.body;
+    const { name, designation, subject } = req.body;
 
     let image_url = null;
-    let image_public_id = null;
 
     if (req.file) {
-      const old = await pool.query(
-        "SELECT image_public_id FROM faculty WHERE id=$1",
-        [id]
-      );
-
-      // 🔧 SAFE DELETE using correct public_id
-      if (old.rows[0]?.image_public_id) {
-        await cloudinary.uploader.destroy(old.rows[0].image_public_id);
+      // Delete old image if exists
+      const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
+      if (old.rows[0]?.image_url) {
+        // Extract public_id from URL
+        const publicId = old.rows[0].image_url
+          .split("/")
+          .slice(-1)[0]
+          .split(".")[0];
+        await cloudinary.uploader.destroy(`faculty/${publicId}`);
         console.log("🗑️ Old Cloudinary image deleted");
       }
-
-      // 🔧 FIX HERE
       image_url = req.file.path;
-      image_public_id = req.file.public_id;
-
       console.log("☁️ New image uploaded:", image_url);
     }
 
@@ -193,52 +116,45 @@ app.put("/faculty/:id", uploadFacultyImage.single("image"), async (req, res) => 
         name=$1,
         designation=$2,
         subject=$3,
-        email=$4,
-        image_url=COALESCE($5, image_url),
-        image_public_id=COALESCE($6, image_public_id)
-       WHERE id=$7
+        image_url=COALESCE($4, image_url)
+       WHERE id=$5
        RETURNING *`,
-      [name, designation, subject, email, image_url, image_public_id, id]
+      [name, designation, subject, image_url, id]
     );
 
     res.json({
       message: "Faculty updated successfully ✅",
-      data: result.rows[0]
+      data: result.rows[0],
     });
-
   } catch (err) {
     console.error("❌ Faculty update failed:", err);
     res.status(500).json({ message: "Failed to update faculty" });
   }
 });
 
-
-// DELETE
-// DELETE
+// DELETE Faculty
 app.delete("/faculty/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const old = await pool.query(
-      "SELECT image_public_id FROM faculty WHERE id=$1",
-      [id]
-    );
-
-    if (old.rows[0]?.image_public_id) {
-      await cloudinary.uploader.destroy(old.rows[0].image_public_id);
+    const old = await pool.query("SELECT image_url FROM faculty WHERE id=$1", [id]);
+    if (old.rows[0]?.image_url) {
+      // Extract public_id from URL
+      const publicId = old.rows[0].image_url
+        .split("/")
+        .slice(-1)[0]
+        .split(".")[0];
+      await cloudinary.uploader.destroy(`faculty/${publicId}`);
       console.log("🗑️ Cloudinary image deleted");
     }
 
     await pool.query("DELETE FROM faculty WHERE id=$1", [id]);
-
     res.json({ message: "Faculty deleted successfully ✅" });
   } catch (err) {
     console.error("❌ Faculty delete failed:", err);
     res.status(500).json({ message: "Failed to delete faculty" });
   }
 });
-
-
 
 
 
