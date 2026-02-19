@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { FiUpload, FiTrash2, FiEye, FiDownload } from "react-icons/fi";
 
 const semesters = [2, 3, 4, 5, 6, 7, 8];
@@ -8,8 +8,8 @@ export default function Academics() {
   const [data, setData] = useState([]);
   const [activeType, setActiveType] = useState("notes");
   const [openSem, setOpenSem] = useState(null);
-  const [uploadInfo, setUploadInfo] = useState(null);
-  const fileInputRef = useRef();
+  const [showModal, setShowModal] = useState(false);
+  const [uploadInfo, setUploadInfo] = useState({ semester: null, title: "", subject: "", file: null });
 
   const API = process.env.REACT_APP_API_URL;
 
@@ -19,48 +19,46 @@ export default function Academics() {
       const res = await fetch(`${API}/academics`);
       const json = await res.json();
       setData(json);
-      console.log("📄 Academics fetched:", json.length);
     } catch (err) {
-      console.error("❌ Fetch failed:", err);
-      alert("Failed to fetch data");
+      console.error(err);
+      alert("Failed to fetch academics");
     }
   };
 
   useEffect(() => fetchData(), []);
 
-  // Delete file
+  // Delete
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this file?")) return;
     try {
       await fetch(`${API}/academics/${id}`, { method: "DELETE" });
       fetchData();
     } catch (err) {
-      console.error("❌ Delete failed:", err);
+      console.error(err);
       alert("Delete failed");
     }
   };
 
-  // Start upload (only one prompt)
-  const startUpload = async (semester) => {
-    const title = prompt("Enter title");
-    if (!title) return alert("Title required");
-    const subject = prompt("Enter subject");
-    if (!subject) return alert("Subject required");
-
-    setUploadInfo({ semester, title, subject });
-    fileInputRef.current.click(); // trigger file select
+  // Open modal
+  const openUploadModal = (semester) => {
+    setUploadInfo({ semester, title: "", subject: "", file: null });
+    setShowModal(true);
   };
 
-  // Handle file selection
-  const handleFileChange = async (e) => {
-    if (!uploadInfo) return;
-    const file = e.target.files[0];
-    if (!file) return alert("Select a PDF file");
+  // Handle file input change
+  const handleFileChange = (e) => {
+    setUploadInfo({ ...uploadInfo, file: e.target.files[0] });
+  };
+
+  // Submit upload
+  const handleUpload = async () => {
+    const { semester, title, subject, file } = uploadInfo;
+    if (!title || !subject || !file) return alert("All fields required");
 
     const formData = new FormData();
-    formData.append("title", uploadInfo.title);
-    formData.append("semester", uploadInfo.semester);
-    formData.append("subject", uploadInfo.subject);
+    formData.append("semester", semester);
+    formData.append("title", title);
+    formData.append("subject", subject);
     formData.append("type", activeType);
     formData.append("file", file);
 
@@ -69,11 +67,10 @@ export default function Academics() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Upload failed");
 
-      console.log("✅ Upload successful:", json);
-      setUploadInfo(null);
+      setShowModal(false);
       fetchData();
     } catch (err) {
-      console.error("❌ Upload failed:", err);
+      console.error(err);
       alert(`Upload failed: ${err.message}`);
     }
   };
@@ -97,14 +94,6 @@ export default function Academics() {
         ))}
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="application/pdf"
-        hidden
-        onChange={handleFileChange}
-      />
-
       {/* Semesters */}
       {semesters.map((sem) => {
         const semData = data.filter((d) => d.semester === sem && d.type === activeType);
@@ -121,7 +110,7 @@ export default function Academics() {
               <div className="p-4">
                 <div className="flex justify-end mb-4">
                   <button
-                    onClick={() => startUpload(sem)}
+                    onClick={() => openUploadModal(sem)}
                     className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
                   >
                     <FiUpload /> Upload
@@ -156,6 +145,45 @@ export default function Academics() {
           </div>
         );
       })}
+
+      {/* ---------- MODAL ---------- */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96">
+            <h2 className="text-xl font-bold mb-4">Upload Academic File</h2>
+
+            <input
+              type="text"
+              placeholder="Title"
+              value={uploadInfo.title}
+              onChange={(e) => setUploadInfo({ ...uploadInfo, title: e.target.value })}
+              className="w-full mb-2 p-2 border rounded"
+            />
+            <input
+              type="text"
+              placeholder="Subject"
+              value={uploadInfo.subject}
+              onChange={(e) => setUploadInfo({ ...uploadInfo, subject: e.target.value })}
+              className="w-full mb-2 p-2 border rounded"
+            />
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileChange}
+              className="w-full mb-4"
+            />
+
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-400 text-white rounded">
+                Cancel
+              </button>
+              <button onClick={handleUpload} className="px-4 py-2 bg-green-600 text-white rounded">
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
