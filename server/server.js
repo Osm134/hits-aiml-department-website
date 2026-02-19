@@ -188,6 +188,7 @@ app.get("/internships", async (_, res) => {
   }
 });
 
+// ✅ Correct
 app.post("/internships", uploadImage("internships").single("certificate"), async (req, res) => {
   try {
     const { name, roll_no, class: className, company } = req.body;
