@@ -32,38 +32,55 @@ pool.connect()
   .catch((err) => console.error("❌ PostgreSQL Connection Error:", err));
 
 
+// Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Multer storage
 const storage = new CloudinaryStorage({
-  cloudinary: cloudinary.v2,
-  params: {
+  cloudinary,
+  params: async (req, file) => ({
     folder: "academics",
-    allowed_formats: ["pdf", "png", "jpg", "jpeg"],
-  },
+    resource_type: "auto", // works for pdf/images
+    public_id: `${Date.now()}-${file.originalname}`,
+  }),
 });
 
 const upload = multer({ storage });
 
-// ================= HELPER =================
-const tables = {
-  notes: "notes",
-  papers: "question_papers",
-  syllabus: "syllabus",
-  timetable: "exam_timetable",
-};
+// ========== ROUTES ==========
 
-// ================= UPLOAD ENDPOINT =================
-app.post("/:type", upload.single("file"), async (req, res) => {
+// GET all academics (optional: filter by type or semester)
+app.get("/academics", async (req, res) => {
   try {
-    const { type } = req.params;
-    const table = tables[type];
-    if (!table) return res.status(400).json({ message: "Invalid type" });
+    const { type } = req.query;
+    let query = "SELECT * FROM academics ORDER BY created_at DESC";
+    let params = [];
+    if (type) {
+      query = "SELECT * FROM academics WHERE type=$1 ORDER BY created_at DESC";
+      params = [type];
+    }
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch academics" });
+  }
+});
 
-    const { title, semester, subject } = req.body;
+// UPLOAD new academic file
+app.post("/academics", upload.single("file"), async (req, res) => {
+  try {
+    const { title, semester, subject, type } = req.body;
+    if (!req.file) return res.status(400).json({ message: "File is required" });
+
     const file_url = req.file.path; // Cloudinary URL
-
     const result = await pool.query(
-      `INSERT INTO ${table} (title, semester, subject, file_url) 
-       VALUES ($1,$2,$3,$4) RETURNING *`,
-      [title, semester, subject || null, file_url]
+      "INSERT INTO academics(title, semester, subject, type, file_url) VALUES($1,$2,$3,$4,$5) RETURNING *",
+      [title, semester, subject, type, file_url]
     );
 
     res.json(result.rows[0]);
@@ -73,43 +90,26 @@ app.post("/:type", upload.single("file"), async (req, res) => {
   }
 });
 
-// ================= GET LIST =================
-app.get("/:type", async (req, res) => {
+// DELETE academic file
+app.delete("/academics/:id", async (req, res) => {
   try {
-    const { type } = req.params;
-    const table = tables[type];
-    if (!table) return res.status(400).json({ message: "Invalid type" });
+    const { id } = req.params;
 
-    const result = await pool.query(`SELECT * FROM ${table} ORDER BY created_at DESC`);
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Fetch failed" });
-  }
-});
+    // Get file public_id from URL
+    const { rows } = await pool.query("SELECT file_url FROM academics WHERE id=$1", [id]);
+    if (!rows.length) return res.status(404).json({ message: "Not found" });
 
-// ================= DELETE =================
-app.delete("/:type/:id", async (req, res) => {
-  try {
-    const { type, id } = req.params;
-    const table = tables[type];
-    if (!table) return res.status(400).json({ message: "Invalid type" });
+    const fileUrl = rows[0].file_url;
+    const publicId = fileUrl.match(/academics\/(.+)\./)[1]; // extract public_id from URL
+    await cloudinary.uploader.destroy(`academics/${publicId}`, { resource_type: "auto" });
 
-    // Optional: delete from Cloudinary
-    const { rows } = await pool.query(`SELECT file_url FROM ${table} WHERE id=$1`, [id]);
-    if (rows.length && rows[0].file_url) {
-      const publicId = rows[0].file_url.split("/").pop().split(".")[0];
-      await cloudinary.v2.uploader.destroy(`academics/${publicId}`);
-    }
-
-    await pool.query(`DELETE FROM ${table} WHERE id=$1`, [id]);
-    res.json({ message: "Deleted successfully ✅" });
+    await pool.query("DELETE FROM academics WHERE id=$1", [id]);
+    res.json({ message: "Deleted ✅" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Delete failed" });
   }
 });
-
   
 /* ================= DAILY UPDATES ================= */
 app.post("/updates", async (req, res) => {
@@ -500,22 +500,8 @@ app.get("/updates", async (req, res) => {
   }
 });
 
-// ---------- ALIAS ROUTES ----------
-app.get("/academic-highlights", (_, res) => res.redirect("/highlights"));
-app.get("/students", (_, res) => res.redirect("/students-rep"));
-
-// ---------- HEALTH ----------
-app.get("/health", async (_, res) => {
-  try {
-    await pool.query("SELECT 1");
-    res.json({ status: "OK", pool: "Connected" });
-  } catch {
-    res.status(500).json({ status: "pool Error" });
-  }
-});
 
 // ---------- ROOT ----------
-app.get("/", (_, res) => res.send("HITS AIML API running 🚀"));
 
 // ================= MULTER + CLOUDINARY faculty  =================
 const facultyStorage = new CloudinaryStorage({
@@ -639,9 +625,10 @@ app.delete("/faculty/:id", async (req, res) => {
 });
 
 // Start server
-app.listen(port, () => {
-  console.log(`✅ Server running on port ${port}`);
-});
+// ---------- ALIAS ROUTES ----------
+app.get("/academic-highlights", (_, res) => res.redirect("/highlights"));
+app.get("/students", (_, res) => res.redirect("/students-rep"));
+
 
 
 /* ================= HEALTH ================= */
