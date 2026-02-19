@@ -40,13 +40,15 @@ export default function Academics() {
     }
   };
 
-  // Start upload
-  const startUpload = (semester) => {
+  // Start upload (only one prompt)
+  const startUpload = async (semester) => {
     const title = prompt("Enter title");
+    if (!title) return alert("Title required");
     const subject = prompt("Enter subject");
-    if (!title || !subject) return alert("Title and Subject required");
+    if (!subject) return alert("Subject required");
+
     setUploadInfo({ semester, title, subject });
-    fileInputRef.current.click();
+    fileInputRef.current.click(); // trigger file select
   };
 
   // Handle file selection
@@ -64,11 +66,10 @@ export default function Academics() {
 
     try {
       const res = await fetch(`${API}/academics`, { method: "POST", body: formData });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Upload failed");
-      }
-      console.log("✅ Upload successful");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Upload failed");
+
+      console.log("✅ Upload successful:", json);
       setUploadInfo(null);
       fetchData();
     } catch (err) {
