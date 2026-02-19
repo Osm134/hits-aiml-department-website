@@ -1,16 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { FiUpload, FiTrash2, FiDownload, FiEye } from "react-icons/fi";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { FiEye, FiDownload, FiTrash2, FiUpload } from "react-icons/fi";
 
 const semesters = [2, 3, 4, 5, 6, 7, 8];
-const types = {
+
+const tabs = {
   notes: "Notes",
-  syllabus: "Syllabus",
   papers: "Question Papers",
-  previous: "Previous Papers",
+  timetable: "Exam Timetable",
+  syllabus: "Syllabus",
 };
 
 export default function Academics() {
-  const [activeType, setActiveType] = useState("notes");
+  const [activeTab, setActiveTab] = useState("notes");
   const [openSem, setOpenSem] = useState(2);
   const [data, setData] = useState([]);
   const [uploadSem, setUploadSem] = useState(null);
@@ -18,25 +19,58 @@ export default function Academics() {
 
   const API = process.env.REACT_APP_API_URL;
 
+  /* ================= FETCH DATA ================= */
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/${activeType}`);
+      const endpoint =
+        activeTab === "notes"
+          ? "notes"
+          : activeTab === "papers"
+          ? "papers"
+          : activeTab === "timetable"
+          ? "exam-timetable"
+          : "syllabus";
+
+      const res = await fetch(`${API}/${endpoint}`);
       if (!res.ok) throw new Error("Fetch failed");
       setData(await res.json());
     } catch (err) {
       console.error(err);
       alert("Failed to load data");
     }
-  }, [activeType]);
+  }, [activeTab]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // ================= UPLOAD =================
+  /* ================= DELETE FILE ================= */
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this file?")) return;
+
+    const endpoint =
+      activeTab === "notes"
+        ? "notes"
+        : activeTab === "papers"
+        ? "papers"
+        : activeTab === "timetable"
+        ? "exam-timetable"
+        : "syllabus";
+
+    try {
+      await fetch(`${API}/${endpoint}/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("Delete failed");
+    }
+  };
+
+  /* ================= UPLOAD FILE ================= */
   const startUpload = (semester) => {
-    const title = prompt("Enter title");
+    const title = prompt("Enter file title");
     if (!title) return;
+
     setUploadSem({ semester, title });
     fileInputRef.current.click();
   };
@@ -50,8 +84,17 @@ export default function Academics() {
     formData.append("semester", uploadSem.semester);
     formData.append("file", file);
 
+    const endpoint =
+      activeTab === "notes"
+        ? "notes"
+        : activeTab === "papers"
+        ? "papers"
+        : activeTab === "timetable"
+        ? "exam-timetable"
+        : "syllabus";
+
     try {
-      const res = await fetch(`${API}/${activeType}`, {
+      const res = await fetch(`${API}/${endpoint}`, {
         method: "POST",
         body: formData,
       });
@@ -66,37 +109,26 @@ export default function Academics() {
     setUploadSem(null);
   };
 
-  // ================= DELETE =================
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this file?")) return;
-    try {
-      await fetch(`${API}/${activeType}/${id}`, { method: "DELETE" });
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      alert("Delete failed");
-    }
-  };
-
   return (
     <div className="max-w-7xl mx-auto p-6">
       <h1 className="text-3xl md:text-4xl font-extrabold mb-8 text-center text-gray-800">
         HITS AIML Academic Resources
       </h1>
 
-      {/* Type Tabs */}
+      {/* Tabs */}
       <div className="flex flex-wrap justify-center gap-3 mb-8">
-        {Object.keys(types).map((type) => (
+        {Object.keys(tabs).map((tab) => (
           <button
-            key={type}
-            onClick={() => setActiveType(type)}
-            className={`px-5 py-2 rounded-full font-semibold transition ${
-              activeType === type
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 hover:bg-blue-500 hover:text-white"
-            }`}
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-5 py-2 rounded-full font-semibold transition
+              ${
+                activeTab === tab
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 hover:bg-blue-500 hover:text-white"
+              }`}
           >
-            {types[type]}
+            {tabs[tab]}
           </button>
         ))}
       </div>
@@ -110,16 +142,19 @@ export default function Academics() {
         onChange={handleFileChange}
       />
 
-      {/* Semesters */}
+      {/* Semester Sections */}
       {semesters.map((sem) => {
-        const semData = data.filter((item) => Number(item.semester) === sem);
+        const semData = data.filter(
+          (item) => Number(item.semester) === Number(sem)
+        );
+
         return (
           <div key={sem} className="mb-6 bg-white shadow rounded-lg">
             <button
               onClick={() => setOpenSem(sem)}
-              className="w-full px-6 py-4 flex justify-between bg-gray-100"
+              className="w-full px-6 py-4 flex justify-between bg-gray-100 font-semibold"
             >
-              Semester {sem} {activeType && `- ${types[activeType]}`}
+              Semester {sem}
               <span>{openSem === sem ? "−" : "+"}</span>
             </button>
 
@@ -128,7 +163,7 @@ export default function Academics() {
                 <div className="mb-6 flex justify-end">
                   <button
                     onClick={() => startUpload(sem)}
-                    className="flex items-center gap-2 bg-green-600 text-white px-5 py-2 rounded"
+                    className="flex items-center gap-2 bg-green-600 text-white px-5 py-2 rounded hover:bg-green-700"
                   >
                     <FiUpload /> Upload
                   </button>
@@ -137,35 +172,35 @@ export default function Academics() {
                 {semData.length ? (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {semData.map((item) => (
-                      <div key={item.id} className="p-4 bg-gray-50 rounded shadow flex flex-col justify-between">
-                        <h2 className="font-semibold">{item.title}</h2>
-                        <small className="text-gray-500">Subject: {item.subject || "N/A"}</small>
+                      <div
+                        key={item.id}
+                        className="p-4 bg-gray-50 rounded shadow flex flex-col justify-between"
+                      >
+                        <h2 className="font-semibold text-blue-700">{item.title}</h2>
+                        <small className="text-gray-500">Semester: {item.semester}</small>
+
                         <div className="flex justify-end gap-3 mt-4">
                           {item.file_url && (
                             <>
                               <a
-                                href={item.file_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="p-2 bg-blue-600 text-white rounded"
-                                title="View"
-                              >
-                                <FiEye />
-                              </a>
-                              <a
-                                href={item.file_url}
-                                download
-                                className="p-2 bg-green-600 text-white rounded"
-                                title="Download"
+                                href={`${API}/download/${activeTab}/${item.id}`}
+                                className="p-2 bg-green-600 text-white rounded hover:bg-green-700"
                               >
                                 <FiDownload />
+                              </a>
+                              <a
+                                href={`${API}${item.file_url}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                              >
+                                <FiEye />
                               </a>
                             </>
                           )}
                           <button
                             onClick={() => handleDelete(item.id)}
-                            className="p-2 bg-red-600 text-white rounded"
-                            title="Delete"
+                            className="p-2 bg-red-600 text-white rounded hover:bg-red-700"
                           >
                             <FiTrash2 />
                           </button>
