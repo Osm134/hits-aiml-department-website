@@ -17,7 +17,15 @@ export default function StudentRepModal({ isOpen, onClose, studentData, refresh 
       setEmail(studentData.email || "");
       setClassName(studentData.class || "");
       setImage(null);
-      setPreview(studentData.image_url ? `https://hits-aiml-department-website.onrender.com${studentData.image_url}` : null);
+
+      // Handle Cloudinary URLs and old relative paths
+      setPreview(
+        studentData.image_url
+          ? studentData.image_url.startsWith("http")
+            ? studentData.image_url
+            : `${process.env.REACT_APP_API_URL}${studentData.image_url}`
+          : null
+      );
     } else {
       setName("");
       setEmail("");
@@ -48,7 +56,7 @@ export default function StudentRepModal({ isOpen, onClose, studentData, refresh 
         });
       }
 
-      refresh(); // refresh the list
+      refresh(); // Refresh student list
       onClose();
     } catch (err) {
       console.error(err);

@@ -219,7 +219,6 @@ export default function Students() {
             <div className="flex justify-end mb-6">
               <button onClick={() => setCreateOpen(true)} className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white">+ Create Club</button>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               {clubs.map((club) => (
                 <div key={club.id} className="bg-white border rounded-xl shadow p-5 flex flex-col justify-between hover:shadow-lg transition">
