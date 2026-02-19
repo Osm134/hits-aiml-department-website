@@ -47,7 +47,6 @@ const createCloudinaryStorage = (folder) =>
 const uploadImage = (folder) => multer({ storage: createCloudinaryStorage(folder) });
 
 // ====================== ROUTES ======================
-
 // ---------- STUDENT REPRESENTATIVES ----------
 app.post("/students-rep", uploadImage("student_reps").single("image"), async (req, res) => {
   try {
@@ -190,59 +189,6 @@ app.delete("/clubs/:id", async (req, res) => {
   }
 });
 
-// ---------- CLUB MEMBERS ----------
-app.get("/clubs/:id/members", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query("SELECT * FROM club_members WHERE club_id=$1", [id]);
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch club members." });
-  }
-});
-
-app.post("/clubs/:id/join", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, roll_no, class: className, email } = req.body;
-    const result = await pool.query(
-      "INSERT INTO club_members(club_id, name, roll_no, class, email) VALUES($1,$2,$3,$4,$5) RETURNING *",
-      [id, name, roll_no, className, email]
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to join club." });
-  }
-});
-
-// ---------- ACADEMIC HIGHLIGHTS ----------
-app.post("/highlights", uploadImage("highlights").single("image"), async (req, res) => {
-  try {
-    const { title, description } = req.body;
-    const image_url = req.file?.path || null;
-    const result = await pool.query(
-      "INSERT INTO academic_highlights(title, description, image_url) VALUES($1,$2,$3) RETURNING *",
-      [title, description, image_url]
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to create highlight." });
-  }
-});
-
-app.get("/highlights", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM academic_highlights ORDER BY id DESC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch highlights." });
-  }
-});
-
 // ---------- EVENTS ----------
 app.post("/events", uploadImage("events").single("image"), async (req, res) => {
   try {
@@ -294,6 +240,23 @@ app.get("/updates", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch updates." });
   }
 });
+
+// ---------- ALIAS ROUTES ----------
+app.get("/academic-highlights", (_, res) => res.redirect("/highlights"));
+app.get("/students", (_, res) => res.redirect("/students-rep"));
+
+// ---------- HEALTH ----------
+app.get("/health", async (_, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ status: "OK", pool: "Connected" });
+  } catch {
+    res.status(500).json({ status: "pool Error" });
+  }
+});
+
+// ---------- ROOT ----------
+app.get("/", (_, res) => res.send("HITS AIML API running 🚀"));
 
 // ================= MULTER + CLOUDINARY faculty  =================
 const facultyStorage = new CloudinaryStorage({
