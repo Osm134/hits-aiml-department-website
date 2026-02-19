@@ -393,34 +393,49 @@ const { data: facultyList, loading: loadingFaculty } = useFetch("/faculty");
 
 
 
-      {/* -------------------- FACULTY SPOTLIGHT -------------------- */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 relative">
-        <h2 className="text-3xl font-bold mb-6 text-[#0B3C78] text-center">Faculty Spotlight</h2>
-        {loadingFaculty ? <p className="text-center">Loading faculty...</p> :
-          facultyList.length === 0 ? <p className="text-center">No faculty available.</p> :
-            <div className="flex space-x-6 overflow-x-auto py-2">
-              {facultyList.map(f => (
-                <div key={f.id} className="min-w-[200px] bg-white rounded-3xl shadow-xl overflow-hidden transform hover:scale-105 transition duration-300">
-<img
-  src={f.image_url ? `${BASE_URL}${f.image_url}` : "/faculty.jpg"}
-  alt={f.name}
-  className="w-full h-48 object-cover"
-/>
+     {/* -------------------- FACULTY SPOTLIGHT -------------------- */}
+<div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 relative">
+  <h2 className="text-3xl font-bold mb-6 text-[#0B3C78] text-center">Faculty Spotlight</h2>
+  
+  {loadingFaculty ? (
+    <p className="text-center">Loading faculty...</p>
+  ) : facultyList.length === 0 ? (
+    <p className="text-center">No faculty available.</p>
+  ) : (
+    <div className="flex space-x-6 overflow-x-auto py-2">
+      {facultyList.map(f => (
+        <div key={f.id} className="min-w-[200px] bg-white rounded-3xl shadow-xl overflow-hidden transform hover:scale-105 transition duration-300">
+          
+          {/* IMAGE WITH CLOUDINARY FALLBACK */}
+          <img
+            src={
+              f.image_url
+                ? f.image_url.startsWith("http")  // full URL
+                  ? f.image_url
+                  : `${BASE_URL}${f.image_url}` // relative path from backend
+                : "/faculty.jpg" // fallback
+            }
+            alt={f.name}
+            className="w-full h-48 object-cover"
+          />
 
+          <div className="bg-[#0B3C78] text-white py-2 text-center">
+            <h3 className="font-semibold text-md">{f.name}</h3>
+            <p className="text-sm">{f.designation}</p>
+            <p className="text-sm">{f.subject}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
 
-                  <div className="bg-[#0B3C78] text-white py-2 text-center">
-                    <h3 className="font-semibold text-md">{f.name}</h3>
-                    <p className="text-sm">{f.designation}</p>
-                    <p className="text-sm">{f.subject}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-        }
-        <button onClick={() => navigate("/faculty")} className="fixed right-5 bottom-20 bg-[#0B3C78] text-white px-5 py-3 rounded-3xl shadow-lg hover:bg-blue-900 transition z-50">
-          View All Faculty
-        </button>
-      </div>
+  <button
+    onClick={() => navigate("/faculty")}
+    className="fixed right-5 bottom-20 bg-[#0B3C78] text-white px-5 py-3 rounded-3xl shadow-lg hover:bg-blue-900 transition z-50"
+  >
+    View All Faculty
+  </button>
+</div>
 
       {/* -------------------- QUICK LINKS -------------------- */}
      {/* -------------------- QUICK LINKS -------------------- */}
