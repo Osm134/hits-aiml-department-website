@@ -24,12 +24,14 @@ export default function Clubs() {
   };
 
   const fetchMembers = async (clubId) => {
+    if (!clubId) return;
     try {
       const res = await axios.get(`${API}/clubs/${clubId}/members`);
       setMembers(res.data || []);
       setSelectedClubId(clubId);
     } catch (err) {
       console.error("Error fetching members:", err);
+      setMembers([]);
     }
   };
 
@@ -53,9 +55,10 @@ export default function Clubs() {
 
     const handleSubmit = async (e) => {
       e.preventDefault();
+      if (!name.trim()) return;
       setLoading(true);
       try {
-        await axios.post(`${API}/clubs`, { name, description, created_by: 1 });
+        await axios.post(`${API}/clubs`, { name, description });
         fetchClubs();
         onClose();
       } catch (err) {
@@ -107,6 +110,7 @@ export default function Clubs() {
 
     const handleSubmit = async (e) => {
       e.preventDefault();
+      if (!clubId) return;
       setLoading(true);
       try {
         await axios.post(`${API}/clubs/${clubId}/join`, { name, roll_no: rollNo, class: className, email });
@@ -146,6 +150,7 @@ export default function Clubs() {
       <div className="flex justify-end mb-6">
         <button onClick={() => setCreateOpen(true)} className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white">+ Create Club</button>
       </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {clubs.map((club) => (
           <div key={club.id} className="bg-white border rounded-xl shadow p-5 flex flex-col justify-between hover:shadow-lg transition">
