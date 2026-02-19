@@ -32,6 +32,140 @@ pool.connect()
   .catch((err) => console.error("❌ PostgreSQL Connection Error:", err));
 
 
+
+
+  
+/* ================= DAILY UPDATES ================= */
+app.post("/updates", async (req, res) => {
+  const { title, description, image_url } = req.body;
+  const result = await pool.query(
+    "INSERT INTO daily_updates(title,description,image_url) VALUES($1,$2,$3) RETURNING *",
+    [title, description, image_url]
+  );
+  res.json(result.rows[0]);
+});
+
+app.get("/updates", async (_, res) => {
+  const result = await pool.query("SELECT * FROM daily_updates ORDER BY created_at DESC");
+  res.json(result.rows);
+});
+
+app.put("/updates/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description } = req.body;
+    const result = await pool.query(
+      "UPDATE daily_updates SET title=$1, description=$2 WHERE id=$3 RETURNING *",
+      [title, description, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Update failed" });
+  }
+});
+
+app.delete("/updates/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM daily_updates WHERE id=$1", [id]);
+    res.json({ message: "Update deleted ✅" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Delete failed" });
+  }
+});
+
+/* ================= NOTES / PAPERS / SYLLABUS / EXAM ================= */
+// Factory for update endpoints with file replacement
+
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary.v2,
+  params: {
+    folder: "academics",
+    allowed_formats: ["pdf", "png", "jpg", "jpeg"],
+  },
+});
+
+const upload = multer({ storage });
+
+// Table mapping
+const tables = {
+  notes: "notes",
+  papers: "question_papers",
+  syllabus: "syllabus",
+  timetable: "exam_timetable",
+};
+
+// Upload
+app.post("/:type", upload.single("file"), async (req, res) => {
+  try {
+    const { type } = req.params;
+    const table = tables[type];
+    if (!table) return res.status(400).json({ message: "Invalid type" });
+
+    const { title, semester, subject } = req.body;
+    const file_url = req.file.path; // Cloudinary URL
+
+    const result = await pool.query(
+      `INSERT INTO ${table} (title, semester, subject, file_url) 
+       VALUES ($1,$2,$3,$4) RETURNING *`,
+      [title, semester, subject || null, file_url]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Upload failed" });
+  }
+});
+
+// Get List
+app.get("/:type", async (req, res) => {
+  try {
+    const { type } = req.params;
+    const table = tables[type];
+    if (!table) return res.status(400).json({ message: "Invalid type" });
+
+    const result = await pool.query(`SELECT * FROM ${table} ORDER BY created_at DESC`);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Fetch failed" });
+  }
+});
+
+// Delete
+app.delete("/:type/:id", async (req, res) => {
+  try {
+    const { type, id } = req.params;
+    const table = tables[type];
+    if (!table) return res.status(400).json({ message: "Invalid type" });
+
+    const { rows } = await pool.query(`SELECT file_url FROM ${table} WHERE id=$1`, [id]);
+    if (rows.length && rows[0].file_url) {
+      const publicId = rows[0].file_url.split("/").pop().split(".")[0];
+      await cloudinary.v2.uploader.destroy(`academics/${publicId}`);
+    }
+
+    await pool.query(`DELETE FROM ${table} WHERE id=$1`, [id]);
+    res.json({ message: "Deleted successfully ✅" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Delete failed" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
   
 /* ========== EVENTS MODULE ========== */
 const activityStorage = new CloudinaryStorage({
@@ -509,209 +643,6 @@ app.delete("/faculty/:id", async (req, res) => {
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
 });
-
-// /* ================= DAILY UPDATES ================= */
-// app.post("/updates", async (req, res) => {
-//   const { title, description, image_url } = req.body;
-//   const result = await pool.query(
-//     "INSERT INTO daily_updates(title,description,image_url) VALUES($1,$2,$3) RETURNING *",
-//     [title, description, image_url]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.get("/updates", async (_, res) => {
-//   const result = await pool.query("SELECT * FROM daily_updates ORDER BY created_at DESC");
-//   res.json(result.rows);
-// });
-
-// app.put("/updates/:id", async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { title, description } = req.body;
-//     const result = await pool.query(
-//       "UPDATE daily_updates SET title=$1, description=$2 WHERE id=$3 RETURNING *",
-//       [title, description, id]
-//     );
-//     res.json(result.rows[0]);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Update failed" });
-//   }
-// });
-
-// app.delete("/updates/:id", async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     await pool.query("DELETE FROM daily_updates WHERE id=$1", [id]);
-//     res.json({ message: "Update deleted ✅" });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Delete failed" });
-//   }
-// });
-
-// /* ================= NOTES / PAPERS / SYLLABUS / EXAM ================= */
-// // Factory for update endpoints with file replacement
-// const updateFileEndpoint = (table, category) => async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { title, semester, subject } = req.body;
-//     let file_url = null;
-
-//     if (req.file) {
-//       file_url = `/${category}/${req.file.filename}`;
-
-//       // Delete old file
-//       const old = await pool.query(`SELECT file_url FROM ${table} WHERE id=$1`, [id]);
-//       if (old.rows.length && old.rows[0].file_url) {
-//         const oldPath = path.join(UPLOAD_DIR, old.rows[0].file_url);
-//         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-//       }
-//     }
-
-//     const result = await pool.query(
-//       `UPDATE ${table} 
-//        SET title=$1, semester=$2, subject=$3,
-//            file_url=COALESCE($4,file_url)
-//        WHERE id=$5 RETURNING *`,
-//       [title, semester, subject, file_url, id]
-//     );
-
-//     res.json(result.rows[0]);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Update failed" });
-//   }
-// };
-
-// // Notes
-// app.post("/notes", uploadPDF("notes").single("file"), async (req, res) => {
-//   const { title, semester, subject } = req.body;
-//   const file_url = `/notes/${req.file.filename}`;
-//   const result = await pool.query(
-//     "INSERT INTO notes(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
-//     [title, semester, subject, file_url]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.get("/notes", async (_, res) => {
-//   const result = await pool.query("SELECT * FROM notes ORDER BY created_at DESC");
-//   res.json(result.rows);
-// });
-
-// app.put("/notes/:id", uploadPDF("notes").single("file"), updateFileEndpoint("notes", "notes"));
-// app.delete("/notes/:id", async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { rows } = await pool.query("SELECT file_url FROM notes WHERE id=$1", [id]);
-//     if (rows.length && rows[0].file_url) {
-//       const filePath = path.join(UPLOAD_DIR, rows[0].file_url);
-//       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-//     }
-//     await pool.query("DELETE FROM notes WHERE id=$1", [id]);
-//     res.json({ message: "Note deleted ✅" });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Delete failed" });
-//   }
-// });
-
-// // Question papers
-// app.post("/papers", uploadPDF("papers").single("file"), async (req, res) => {
-//   const { title, semester, subject } = req.body;
-//   const file_url = `/papers/${req.file.filename}`;
-//   const result = await pool.query(
-//     "INSERT INTO question_papers(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
-//     [title, semester, subject, file_url]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.get("/papers", async (_, res) => {
-//   const result = await pool.query("SELECT * FROM question_papers");
-//   res.json(result.rows);
-// });
-
-// app.put("/papers/:id", uploadPDF("papers").single("file"), updateFileEndpoint("question_papers", "papers"));
-// app.delete("/papers/:id", async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { rows } = await pool.query("SELECT file_url FROM question_papers WHERE id=$1", [id]);
-//     if (rows.length && rows[0].file_url) {
-//       const filePath = path.join(UPLOAD_DIR, rows[0].file_url);
-//       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-//     }
-//     await pool.query("DELETE FROM question_papers WHERE id=$1", [id]);
-//     res.json({ message: "Paper deleted ✅" });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Delete failed" });
-//   }
-// });
-
-// // Syllabus
-// app.post("/syllabus", uploadPDF("syllabus").single("file"), async (req, res) => {
-//   const { title, semester, subject } = req.body;
-//   const file_url = `/syllabus/${req.file.filename}`;
-//   const result = await pool.query(
-//     "INSERT INTO syllabus(title,semester,subject,file_url) VALUES($1,$2,$3,$4) RETURNING *",
-//     [title, semester, subject, file_url]
-//   );
-//   res.json(result.rows[0]);
-// });
-
-// app.get("/syllabus", async (_, res) => {
-//   const result = await pool.query("SELECT * FROM syllabus ORDER BY semester");
-//   res.json(result.rows);
-// });
-
-// app.put("/syllabus/:id", uploadPDF("syllabus").single("file"), updateFileEndpoint("syllabus", "syllabus"));
-// app.delete("/syllabus/:id", async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { rows } = await pool.query("SELECT file_url FROM syllabus WHERE id=$1", [id]);
-//     if (rows.length && rows[0].file_url) {
-//       const filePath = path.join(UPLOAD_DIR, rows[0].file_url);
-//       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-//     }
-//     await pool.query("DELETE FROM syllabus WHERE id=$1", [id]);
-//     res.json({ message: "Syllabus deleted ✅" });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Delete failed" });
-//   }
-// });
-
-// /* ================= DOWNLOAD ENDPOINT ================= */
-// app.get("/download/:type/:id", async (req, res) => {
-//   try {
-//     const { type, id } = req.params;
-//     let table;
-//     if (type === "notes") table = "notes";
-//     else if (type === "papers") table = "question_papers";
-//     else if (type === "syllabus") table = "syllabus";
-//     else if (type === "exam-timetable") table = "exam_timetable";
-//     else return res.status(400).json({ message: "Invalid type" });
-
-//     const data = await pool.query(`SELECT file_url, title FROM ${table} WHERE id=$1`, [id]);
-//     if (!data.rows.length) return res.status(404).json({ message: "File not found" });
-
-//     const filePath = path.join(UPLOAD_DIR, data.rows[0].file_url);
-//     if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File missing" });
-
-//     res.download(filePath, path.basename(data.rows[0].file_url));
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Download failed" });
-//   }
-// });
-
-// /* ================= OTHER MODULES ================= */
-// /* ================= OTHER MODULES FULLY IMPLEMENTED ================= */
-
-
 
 
 /* ================= HEALTH ================= */
