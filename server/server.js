@@ -39,36 +39,33 @@ pool.connect()
 
 
 
-
-// ---------------- CLOUDINARY + MULTER ----------------
-const cloudinaryStorage = new CloudinaryStorage({
+// ---------------- CLOUDINARY STORAGE ----------------
+c
+// Multer + Cloudinary Storage
+const academicStorage = new CloudinaryStorage({
   cloudinary: cloud,
   params: async (req, file) => {
-    const { semester, title, subject } = req.body;
-
-    // safe PDF filename
-    const timestamp = Date.now();
-    const safeTitle = title.replace(/\s+/g, "_");
-    const safeSubject = subject.replace(/\s+/g, "_");
-    const filename = `sem${semester}_${safeTitle}_${safeSubject}_${timestamp}`;
+    // Generate readable filename
+    const semester = req.body.semester || "unknown";
+    const title = req.body.title || "file";
+    const safeName = `${semester}_${title}`.replace(/\s+/g, "_").substring(0, 50); // max 50 chars
 
     return {
       folder: "academics",
-      public_id: filename,
+      public_id: safeName,
       resource_type: "raw",
-      format: "pdf",
+      format: "pdf",      // force PDF
+      type: "upload",     // public upload
     };
   },
 });
 
-const upload = multer({ storage: cloudinaryStorage });
+const upload = multer({ storage: academicStorage });
 
-// ---------------- GET ALL ----------------
+// -------- GET ALL ACADEMICS --------
 app.get("/academics", async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      "SELECT * FROM academics ORDER BY created_at DESC"
-    );
+    const { rows } = await pool.query("SELECT * FROM academics ORDER BY created_at DESC");
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -76,13 +73,13 @@ app.get("/academics", async (req, res) => {
   }
 });
 
-// ---------------- UPLOAD ----------------
+// -------- UPLOAD ACADEMIC PDF --------
 app.post("/academics", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     const { title, semester, subject, type } = req.body;
-    const file_url = req.file.path; // Cloudinary PDF URL
+    const file_url = req.file.path;          // Cloudinary URL
     const cloud_public_id = req.file.filename || req.file.public_id;
 
     const { rows } = await pool.query(
@@ -98,19 +95,15 @@ app.post("/academics", upload.single("file"), async (req, res) => {
   }
 });
 
-// ---------------- DELETE ----------------
+// -------- DELETE ACADEMIC PDF --------
 app.delete("/academics/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { rows } = await pool.query(
-      "SELECT cloud_public_id FROM academics WHERE id=$1",
-      [id]
-    );
+    const { rows } = await pool.query("SELECT cloud_public_id FROM academics WHERE id=$1", [id]);
     if (!rows.length) return res.status(404).json({ message: "Not found" });
 
     const publicId = rows[0].cloud_public_id;
-
-    if (publicId) await cloud.uploader.destroy(publicId, { resource_type: "raw" });
+    if (publicId) await cloud.uploader.destroy(`academics/${publicId}`, { resource_type: "raw" });
 
     await pool.query("DELETE FROM academics WHERE id=$1", [id]);
     res.json({ message: "Deleted ✅" });
@@ -119,10 +112,6 @@ app.delete("/academics/:id", async (req, res) => {
     res.status(500).json({ message: "Delete failed", error: err.message });
   }
 });
-
-
-
-
 
 
 

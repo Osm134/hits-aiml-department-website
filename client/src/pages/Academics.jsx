@@ -13,6 +13,7 @@ export default function Academics() {
 
   const API = process.env.REACT_APP_API_URL;
 
+  // Fetch data
   const fetchData = async () => {
     try {
       const res = await fetch(`${API}/academics`);
@@ -26,6 +27,7 @@ export default function Academics() {
 
   useEffect(() => fetchData(), []);
 
+  // Delete
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this file?")) return;
     try {
@@ -37,15 +39,18 @@ export default function Academics() {
     }
   };
 
+  // Open modal
   const openUploadModal = (semester) => {
     setUploadInfo({ semester, title: "", subject: "", file: null });
     setShowModal(true);
   };
 
+  // Handle file input change
   const handleFileChange = (e) => {
     setUploadInfo({ ...uploadInfo, file: e.target.files[0] });
   };
 
+  // Submit upload
   const handleUpload = async () => {
     const { semester, title, subject, file } = uploadInfo;
     if (!title || !subject || !file) return alert("All fields required");
@@ -70,33 +75,40 @@ export default function Academics() {
     }
   };
 
-  const downloadPDF = (url, title) => {
+  // Download helper
+  const handleDownload = (url, title, semester) => {
     fetch(url)
       .then((res) => res.blob())
       .then((blob) => {
-        const link = document.createElement("a");
-        link.href = window.URL.createObjectURL(blob);
-        link.download = title.endsWith(".pdf") ? title : `${title}.pdf`;
-        link.click();
-      });
+        const a = document.createElement("a");
+        const fileName = `${semester}_${title}`.replace(/\s+/g, "_") + ".pdf";
+        a.href = window.URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+      })
+      .catch((err) => console.error("Download failed:", err));
   };
 
   return (
     <div className="max-w-7xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6 text-center">HITS AIML Academics</h1>
 
+      {/* Type Tabs */}
       <div className="flex justify-center gap-3 mb-6">
         {types.map((t) => (
           <button
             key={t}
             onClick={() => setActiveType(t)}
-            className={`px-4 py-2 rounded-full font-semibold ${activeType === t ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+            className={`px-4 py-2 rounded-full font-semibold ${
+              activeType === t ? "bg-blue-600 text-white" : "bg-gray-200"
+            }`}
           >
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
 
+      {/* Semesters */}
       {semesters.map((sem) => {
         const semData = data.filter((d) => d.semester === sem && d.type === activeType);
         return (
@@ -111,7 +123,10 @@ export default function Academics() {
             {openSem === sem && (
               <div className="p-4">
                 <div className="flex justify-end mb-4">
-                  <button onClick={() => openUploadModal(sem)} className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2">
+                  <button
+                    onClick={() => openUploadModal(sem)}
+                    className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
+                  >
                     <FiUpload /> Upload
                   </button>
                 </div>
@@ -123,16 +138,26 @@ export default function Academics() {
                         <p className="font-semibold">{item.title}</p>
                         <small className="text-gray-500">Subject: {item.subject}</small>
                         <div className="flex gap-2 mt-2">
-                          <a href={item.file_url} target="_blank" rel="noreferrer" className="bg-blue-600 text-white p-2 rounded">
+                          {/* VIEW button */}
+                          <a
+                            href={item.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-blue-600 text-white p-2 rounded flex items-center"
+                          >
                             <FiEye />
                           </a>
+
+                          {/* DOWNLOAD button */}
                           <button
-                            onClick={() => downloadPDF(item.file_url, item.title)}
-                            className="bg-green-600 text-white p-2 rounded"
+                            onClick={() => handleDownload(item.file_url, item.title, item.semester)}
+                            className="bg-green-600 text-white p-2 rounded flex items-center"
                           >
                             <FiDownload />
                           </button>
-                          <button onClick={() => handleDelete(item.id)} className="bg-red-600 text-white p-2 rounded">
+
+                          {/* DELETE button */}
+                          <button onClick={() => handleDelete(item.id)} className="bg-red-600 text-white p-2 rounded flex items-center">
                             <FiTrash2 />
                           </button>
                         </div>
@@ -148,10 +173,12 @@ export default function Academics() {
         );
       })}
 
+      {/* ---------- MODAL ---------- */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg w-96">
             <h2 className="text-xl font-bold mb-4">Upload Academic File</h2>
+
             <input
               type="text"
               placeholder="Title"
