@@ -1,44 +1,72 @@
+import { useState } from "react";
 import axios from "axios";
 
-export default function EventCard({ event, refresh }) {
-  const deleteEvent = async () => {
-    if (!window.confirm("Are you sure you want to delete this activity?")) return;
-    await axios.delete(`${process.env.REACT_APP_API_URL}/api/activities/${event.id}`);
-    refresh();
+export default function EventForm({ onClose, refresh }) {
+  const [form, setForm] = useState({
+    title: "",
+    category: "Events",
+    description: "",
+    event_date: "",
+  });
+  const [image, setImage] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    try {
+      const data = new FormData();
+      Object.entries(form).forEach(([k, v]) => data.append(k, v));
+      if (image) data.append("image", image);
+
+      await axios.post(`${process.env.REACT_APP_API_URL}/api/activities`, data);
+      refresh();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save activity");
+    }
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition overflow-hidden flex flex-col w-full max-w-md mx-auto md:mx-0 animate-slide-in">
-      
-      {/* IMAGE */}
-      {event.image_url && (
-        <div className="relative w-full">
-          <img
-            src={`${process.env.REACT_APP_API_URL}${event.image_url}`}
-            alt={event.title}
-            className="w-full h-auto object-contain object-center transition-transform duration-300 hover:scale-105"
-          />
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 text-white text-xs sm:text-sm">
-            {event.category}
-          </div>
-        </div>
-      )}
-
-      {/* CONTENT */}
-      <div className="p-4 flex flex-col flex-grow">
-        <h3 className="font-bold text-base sm:text-lg text-blue-700">{event.title}</h3>
-        <p className="text-gray-600 mt-1 text-sm sm:text-base">
-          {new Date(event.event_date).toLocaleDateString()}
-        </p>
-        <p className="text-gray-700 mt-2 text-sm sm:text-base flex-grow">{event.description}</p>
-
-        <button
-          onClick={deleteEvent}
-          className="mt-4 bg-red-100 text-red-600 px-3 py-2 rounded-lg hover:bg-red-200 transition font-semibold text-sm sm:text-base"
-        >
-          Delete
-        </button>
-      </div>
-    </div>
+    <form onSubmit={submit} className="space-y-4">
+      <input
+        placeholder="Title"
+        className="border p-2 w-full rounded-lg"
+        required
+        onChange={(e) => setForm({ ...form, title: e.target.value })}
+      />
+      <textarea
+        placeholder="Description"
+        className="border p-2 w-full rounded-lg"
+        required
+        rows={4}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+      />
+      <select
+        className="border p-2 w-full rounded-lg"
+        onChange={(e) => setForm({ ...form, category: e.target.value })}
+        defaultValue="Events"
+      >
+        <option>Events</option>
+        <option>Workshops</option>
+        <option>Seminars</option>
+        <option>Hackathons</option>
+        <option>Clubs</option>
+        <option>Achievements</option>
+      </select>
+      <input
+        type="date"
+        className="border p-2 w-full rounded-lg"
+        onChange={(e) => setForm({ ...form, event_date: e.target.value })}
+        required
+      />
+      <input
+        type="file"
+        className="w-full"
+        onChange={(e) => setImage(e.target.files[0])}
+      />
+      <button className="w-full bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800 transition">
+        Save Activity
+      </button>
+    </form>
   );
 }
