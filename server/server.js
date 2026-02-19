@@ -40,7 +40,7 @@ pool.connect()
 
 
 // ---------------- CLOUDINARY STORAGE ----------------
-c
+
 // Multer + Cloudinary Storage
 const academicStorage = new CloudinaryStorage({
   cloudinary: cloud,
