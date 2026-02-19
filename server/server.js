@@ -41,21 +41,27 @@ pool.connect()
 
 
 
-
+// CLOUDINARY STORAGE (custom filename)
 const cloudinaryStorage = new CloudinaryStorage({
   cloudinary: cloud,
-  params: {
-    folder: "academics",
-    resource_type: "raw", // for PDFs
-    allowed_formats: ["pdf"],
+  params: async (req, file) => {
+    const { semester, title, subject } = req.body;
+    const timestamp = Date.now();
+    const safeTitle = title.replace(/\s+/g, "_");
+    const safeSubject = subject.replace(/\s+/g, "_");
+
+    return {
+      folder: "academics",
+      public_id: `sem${semester}_${safeTitle}_${safeSubject}_${timestamp}`,
+      resource_type: "raw",
+      format: "pdf",
+    };
   },
 });
 
 const upload = multer({ storage: cloudinaryStorage });
 
-// ===== Routes =====
-
-// ----------------- GET ALL -----------------
+// GET all
 app.get("/academics", async (req, res) => {
   try {
     const { rows } = await pool.query("SELECT * FROM academics ORDER BY created_at DESC");
@@ -66,7 +72,7 @@ app.get("/academics", async (req, res) => {
   }
 });
 
-// ----------------- UPLOAD -----------------
+// UPLOAD
 app.post("/academics", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -88,7 +94,7 @@ app.post("/academics", upload.single("file"), async (req, res) => {
   }
 });
 
-// ----------------- DELETE -----------------
+// DELETE
 app.delete("/academics/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -98,14 +104,15 @@ app.delete("/academics/:id", async (req, res) => {
     const publicId = rows[0].cloud_public_id;
 
     if (publicId) await cloud.uploader.destroy(publicId, { resource_type: "raw" });
-
     await pool.query("DELETE FROM academics WHERE id=$1", [id]);
+
     res.json({ message: "Deleted ✅" });
   } catch (err) {
     console.error("Delete failed:", err);
     res.status(500).json({ message: "Delete failed", error: err.message });
   }
 });
+
 
 
 
