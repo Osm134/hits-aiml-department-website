@@ -32,92 +32,112 @@ pool.connect()
   .catch((err) => console.error("❌ PostgreSQL Connection Error:", err));
 
 
-
-
-
-
-// Multer + Cloudinary storage for event images
-const eventImageStorage = new CloudinaryStorage({
+  const eventStorage = new CloudinaryStorage({
   cloudinary: cloud,
   params: {
-    folder: "event_images",
+    folder: "events",
     allowed_formats: ["jpg", "jpeg", "png", "webp"],
-    transformation: [{ width: 800, height: 800, crop: "limit" }],
+    transformation: [{ width: 900, height: 600, crop: "limit" }],
   },
 });
 
-const uploadEventImage = multer({ storage: eventImageStorage });
+const uploadEventImage = multer({ storage: eventStorage });
 
-
-
-// GET all images for a specific event
-app.get("/event-images/:event_id", async (req, res) => {
+app.post("/events", uploadEventImage.single("image"), async (req, res) => {
   try {
-    const { event_id } = req.params;
+    const { title, description, date } = req.body;
+    const image_url = req.file?.path || null;
+
     const result = await pool.query(
-      "SELECT * FROM event_images WHERE event_id=$1 ORDER BY created_at DESC",
-      [event_id]
+      `INSERT INTO events(title, description, date, image_url)
+       VALUES($1,$2,$3,$4) RETURNING *`,
+      [title, description, date, image_url]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to create event" });
+  }
+});
+
+
+app.get("/events", async (_, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM events ORDER BY date DESC"
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to fetch event images" });
+    res.status(500).json({ message: "Failed to fetch events" });
   }
 });
 
-// ADD an image for an event
-app.post("/event-images", uploadEventImage.single("image"), async (req, res) => {
+app.put("/events/:id", uploadEventImage.single("image"), async (req, res) => {
   try {
-    const { event_id } = req.body;
-    if (!req.file) return res.status(400).json({ message: "No image uploaded" });
+    const { id } = req.params;
+    const { title, description, date } = req.body;
 
-    const image_url = req.file.path;
+    const old = await pool.query(
+      "SELECT image_url FROM events WHERE id=$1",
+      [id]
+    );
+
+    if (!old.rows.length) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    let image_url = old.rows[0].image_url;
+
+    if (req.file) {
+      const publicId = getPublicId(image_url);
+      if (publicId) {
+        await cloud.uploader.destroy(publicId);
+      }
+      image_url = req.file.path;
+    }
 
     const result = await pool.query(
-      "INSERT INTO event_images(event_id, image_url) VALUES($1, $2) RETURNING *",
-      [event_id, image_url]
+      `UPDATE events
+       SET title=$1, description=$2, date=$3, image_url=$4
+       WHERE id=$5 RETURNING *`,
+      [title, description, date, image_url, id]
     );
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Failed to upload image" });
+    res.status(500).json({ message: "Failed to update event" });
   }
 });
 
-// DELETE an image
-app.delete("/event-images/:id", async (req, res) => {
+
+app.delete("/events/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get old image URL
-    const old = await pool.query("SELECT image_url FROM event_images WHERE id=$1", [id]);
-    if (old.rows[0]?.image_url) {
-      const publicId = old.rows[0].image_url.split("/").slice(-1)[0].split(".")[0];
-      await cloud.uploader.destroy(`event_images/${publicId}`);
+    const old = await pool.query(
+      "SELECT image_url FROM events WHERE id=$1",
+      [id]
+    );
+
+    if (!old.rows.length) {
+      return res.status(404).json({ message: "Event not found" });
     }
 
-    // Delete from DB
-    await pool.query("DELETE FROM event_images WHERE id=$1", [id]);
-    res.json({ message: "Event image deleted ✅" });
+    const publicId = getPublicId(old.rows[0].image_url);
+    if (publicId) {
+      await cloud.uploader.destroy(publicId);
+    }
+
+    await pool.query("DELETE FROM events WHERE id=$1", [id]);
+
+    res.json({ message: "Event deleted ✅" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Failed to delete image" });
+    res.status(500).json({ message: "Failed to delete event" });
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
