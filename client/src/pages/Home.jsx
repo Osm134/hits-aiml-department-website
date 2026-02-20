@@ -55,7 +55,7 @@ const { data: facultyList, loading: loadingFaculty } = useFetch("/faculty");
   const [modalOpen, setModalOpen] = useState(false);
   const [highlightTitle, setHighlightTitle] = useState("");
   const [highlightDesc, setHighlightDesc] = useState("");
-
+const [highlightLink, setHighlightLink] = useState("");
   /* -------------------- EVENT MODAL STATE -------------------- */
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
@@ -174,9 +174,10 @@ const saveEvent = async () => {
     if (!highlightTitle.trim() || !highlightDesc.trim()) return alert("Please enter both title and description!");
     try {
       await API.post("/academic-highlights", {
-        title: highlightTitle,
-        description: highlightDesc,
-      });
+  title: highlightTitle,
+  description: highlightDesc,
+  link: highlightLink || null, // add state for link if needed
+});
       const res = await API.get("/academic-highlights");
       setHighlight(res.data[0]);
       setModalOpen(false);
