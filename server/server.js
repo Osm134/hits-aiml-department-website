@@ -747,6 +747,65 @@ app.get("/academic-highlights", (_, res) => res.redirect("/highlights"));
 app.get("/students", (_, res) => res.redirect("/students-rep"));
 
 
+/* ================= ACADEMIC HIGHLIGHTS ================= */
+
+// GET all academic highlights
+app.get("/academic-highlights", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM academic_highlights ORDER BY created_at DESC"
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ Failed to fetch academic highlights:", err);
+    res.status(500).json({ message: "Failed to fetch academic highlights" });
+  }
+});
+
+// CREATE new academic highlight
+app.post("/academic-highlights", async (req, res) => {
+  try {
+    const { title, description, link } = req.body;
+    const { rows } = await pool.query(
+      "INSERT INTO academic_highlights(title, description, link) VALUES($1, $2, $3) RETURNING *",
+      [title, description, link]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error("❌ Failed to create academic highlight:", err);
+    res.status(500).json({ message: "Failed to create academic highlight" });
+  }
+});
+
+// UPDATE an academic highlight
+app.put("/academic-highlights/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, link } = req.body;
+    const { rows } = await pool.query(
+      "UPDATE academic_highlights SET title=$1, description=$2, link=$3 WHERE id=$4 RETURNING *",
+      [title, description, link, id]
+    );
+    if (!rows.length) return res.status(404).json({ message: "Highlight not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("❌ Failed to update academic highlight:", err);
+    res.status(500).json({ message: "Failed to update academic highlight" });
+  }
+});
+
+// DELETE an academic highlight
+app.delete("/academic-highlights/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM academic_highlights WHERE id=$1", [id]);
+    res.json({ message: "Academic highlight deleted ✅" });
+  } catch (err) {
+    console.error("❌ Failed to delete academic highlight:", err);
+    res.status(500).json({ message: "Failed to delete academic highlight" });
+  }
+});
+
 
 /* ================= HEALTH ================= */
 app.get("/health", async (_, res) => {
