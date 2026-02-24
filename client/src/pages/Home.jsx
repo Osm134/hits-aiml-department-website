@@ -51,8 +51,10 @@ const { data: events, refetch: refetchEvents } = useFetch("/events");
 const { data: facultyList, loading: loadingFaculty } = useFetch("/faculty");
 
   /* -------------------- HIGHLIGHT STATE -------------------- */
-  const [highlight, setHighlight] = useState(null);
+  const [highlights, setHighlights] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingHighlightId, setEditingHighlightId] = useState(null);
+
   const [highlightTitle, setHighlightTitle] = useState("");
   const [highlightDesc, setHighlightDesc] = useState("");
 const [highlightLink, setHighlightLink] = useState("");
@@ -71,16 +73,16 @@ const [eventForm, setEventForm] = useState({
 
   /* -------------------- FETCH HIGHLIGHT -------------------- */
   useEffect(() => {
-    const fetchHighlight = async () => {
-      try {
-        const res = await API.get("/academic-highlights");
-        if (res.data.length) setHighlight(res.data[0]);
-      } catch (err) {
-        console.error("Failed to fetch academic highlight:", err);
-      }
-    };
-    fetchHighlight();
-  }, []);
+  const fetchHighlights = async () => {
+    try {
+      const res = await API.get("/academic-highlights");
+      setHighlights(res.data);
+    } catch (err) {
+      console.error("Failed to fetch academic highlights:", err);
+    }
+  };
+  fetchHighlights();
+}, []);
 
   /* -------------------- AUTOMATIC EVENT SLIDE -------------------- */
   useEffect(() => {
@@ -171,21 +173,38 @@ const saveEvent = async () => {
 
   /* -------------------- SAVE HIGHLIGHT -------------------- */
   const saveHighlight = async () => {
-    if (!highlightTitle.trim() || !highlightDesc.trim()) return alert("Please enter both title and description!");
-    try {
+  if (!highlightTitle.trim() || !highlightDesc.trim()) {
+    alert("Please enter both title and description!");
+    return;
+  }
+
+  try {
+    if (editingHighlightId) {
+      // UPDATE
+      await API.put(`/academic-highlights/${editingHighlightId}`, {
+        title: highlightTitle,
+        description: highlightDesc,
+        link: highlightLink || null,
+      });
+    } else {
+      // CREATE
       await API.post("/academic-highlights", {
-  title: highlightTitle,
-  description: highlightDesc,
-  link: highlightLink || null, // add state for link if needed
-});
-      const res = await API.get("/academic-highlights");
-      setHighlight(res.data[0]);
-      setModalOpen(false);
-    } catch (err) {
-      console.error("Failed to save highlight:", err);
-      alert("Failed to save. Try again!");
+        title: highlightTitle,
+        description: highlightDesc,
+        link: highlightLink || null,
+      });
     }
-  };
+
+    const res = await API.get("/academic-highlights");
+    setHighlights(res.data);
+
+    setEditingHighlightId(null);
+    setModalOpen(false);
+  } catch (err) {
+    console.error("Failed to save highlight:", err);
+    alert("Save failed. Try again!");
+  }
+};
 
   /* -------------------- QUICK LINKS -------------------- */
  const quickLinks = [
@@ -275,17 +294,31 @@ const saveEvent = async () => {
         <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition">
           <div className="bg-[#D97706] text-white px-4 py-2 font-semibold rounded-t-2xl text-lg flex justify-between items-center">
             Academic Highlights
-            <button onClick={() => { setHighlightTitle(highlight?.title || ""); setHighlightDesc(highlight?.description || ""); setModalOpen(true); }} className="hover:bg-orange-700 p-1 rounded">
-              <Edit className="w-5 h-5 text-white" />
-            </button>
+            <button
+  onClick={() => {
+    const h = highlights[0];
+    if (!h) return;
+
+    setHighlightTitle(h.title);
+    setHighlightDesc(h.description);
+    setHighlightLink(h.link || "");
+    setEditingHighlightId(h.id);
+    setModalOpen(true);
+  }}
+  className="hover:bg-orange-700 p-1 rounded"
+>
+  <Edit className="w-5 h-5 text-white" />
+</button>
           </div>
           <div className="p-4 space-y-3 text-gray-700 text-base max-h-44 overflow-y-auto">
-            {highlight ? (
-              <>
-                <p className="line-clamp-2"><span className="font-semibold">Title:</span> {highlight.title}</p>
-                <p className="line-clamp-3"><span className="font-semibold">Description:</span> {highlight.description}</p>
-              </>
-            ) : <p className="text-gray-500">No academic highlight available.</p>}
+{highlights.length > 0 ? (
+  <>
+    <p><span className="font-semibold">Title:</span> {highlights[0].title}</p>
+    <p><span className="font-semibold">Description:</span> {highlights[0].description}</p>
+  </>
+) : (
+  <p className="text-gray-500">No academic highlight available.</p>
+)}
           </div>
         </div>
       </div>
