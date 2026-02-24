@@ -743,7 +743,6 @@ app.delete("/faculty/:id", async (req, res) => {
 
 // Start server
 // ---------- ALIAS ROUTES ----------
-app.get("/academic-highlights", (_, res) => res.redirect("/highlights"));
 app.get("/students", (_, res) => res.redirect("/students-rep"));
 
 

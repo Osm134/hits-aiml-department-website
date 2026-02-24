@@ -492,16 +492,16 @@ const saveEvent = async () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row justify-between">
           <div className="space-y-2">
             <h3 className="font-bold text-lg">AIML Department</h3>
-            <p>Email: info@aimlcollege.edu</p>
-            <p>Phone: +91 12345 67890</p>
-            <p>Address: AIML College, City, State</p>
+            <p>Email: hitsaiml@hmgi.ac.in</p>
+            <p>Phone: 7799256453</p>
+            <p>Address: HITS AIML College, bogaram, Hyderabad</p>
           </div>
           <div className="space-y-2 mt-4 md:mt-0 text-right">
             <p>Follow us:</p>
             <div className="flex space-x-4 justify-end">
-              <a href="#" className="hover:underline">Facebook</a>
-              <a href="#" className="hover:underline">Twitter</a>
-              <a href="#" className="hover:underline">Instagram</a>
+              <a href="https://www.facebook.com/share/19fwTpokyE/" className="hover:underline">Facebook</a>
+              <a href=" https://youtube.com/@hits1994?si=c-6OhiIfBum4J2ls" className="hover:underline">YouTube</a>
+              <a href="https://www.instagram.com/hits_chronicles?igsh=MWZxcmhoY3VqMnV1eQ== " className="hover:underline">Instagram</a>
             </div>
           </div>
         </div>
