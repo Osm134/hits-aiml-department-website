@@ -170,33 +170,43 @@ export default function Clubs() {
         ))}
       </div>
 
-      {members.length > 0 && (
-        <div className="mt-8 bg-white p-5 rounded-xl shadow">
-          <h3 className="text-2xl font-bold mb-4">Club Members</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto border-collapse border text-left">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border px-3 py-2">Name</th>
-                  <th className="border px-3 py-2">Roll No</th>
-                  <th className="border px-3 py-2">Class</th>
-                  <th className="border px-3 py-2">Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((m) => (
-                  <tr key={m.id}>
-                    <td className="border px-3 py-2">{m.name}</td>
-                    <td className="border px-3 py-2">{m.roll_no}</td>
-                    <td className="border px-3 py-2">{m.class}</td>
-                    <td className="border px-3 py-2">{m.email}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+     {selectedClubId && (
+  <div className="mt-8 bg-white p-5 rounded-xl shadow">
+    <h3 className="text-2xl font-bold mb-4">Club Members</h3>
+
+    <div className="overflow-x-auto">
+      <table className="w-full table-auto border-collapse border text-left">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="border px-3 py-2">Name</th>
+            <th className="border px-3 py-2">Roll No</th>
+            <th className="border px-3 py-2">Class</th>
+            <th className="border px-3 py-2">Email</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {members.length === 0 ? (
+            <tr>
+              <td colSpan="4" className="text-center py-4">
+                No members yet.
+              </td>
+            </tr>
+          ) : (
+            members.map((m) => (
+              <tr key={m.id}>
+                <td className="border px-3 py-2">{m.name}</td>
+                <td className="border px-3 py-2">{m.roll_no}</td>
+                <td className="border px-3 py-2">{m.class}</td>
+                <td className="border px-3 py-2">{m.email}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+)}
 
       <CreateClubModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
       <JoinClubModal isOpen={joinOpen} onClose={() => setJoinOpen(false)} clubId={selectedClubId} />
