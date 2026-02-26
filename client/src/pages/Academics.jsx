@@ -94,20 +94,32 @@ export default function Academics() {
       <h1 className="text-3xl font-bold mb-6 text-center">HITS AIML Academics</h1>
 
       {/* Type Tabs */}
-      <div className="flex justify-center gap-3 mb-6">
-        {types.map((t) => (
-          <button
-            key={t}
-            onClick={() => setActiveType(t)}
-            className={`px-4 py-2 rounded-full font-semibold ${
-              activeType === t ? "bg-blue-600 text-white" : "bg-gray-200"
-            }`}
-          >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
-
+      {/* Type Tabs */}
+<div className="flex justify-center gap-4 mb-6">
+  {types.map((t) => (
+    <button
+      key={t}
+      onClick={() => setActiveType(t)}
+      className={`
+        flex-1 
+        px-4 py-2 
+        rounded-full 
+        font-semibold 
+        text-center 
+        transition-colors duration-200
+        ${activeType === t ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}
+      `}
+    >
+      {t === "syllabus"
+        ? "Academic Syllabus"
+        : t === "previous"
+        ? "Previous Question Papers"
+        : t === "notes"
+        ? "Academic Calendar"
+        : "Exam Calendar"}
+    </button>
+  ))}
+</div>
       {/* Semesters */}
       {semesters.map((sem) => {
         const semData = data.filter((d) => d.semester === sem && d.type === activeType);
