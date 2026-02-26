@@ -264,9 +264,8 @@ const saveEvent = async () => {
       </div>
 
       {/* -------------------- UPDATES + HIGHLIGHT -------------------- */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 grid md:grid-cols-3 gap-6 mb-12">
-        {/* Daily Updates */}
-        <div className="md:col-span-2 bg-white rounded-2xl shadow-lg hover:shadow-xl transition p-4 flex flex-col">
+<div className="max-w-7xl mx-auto px-4 sm:px-6 grid md:grid-cols-1 gap-6 mb-12">        {/* Daily Updates */}
+        <div className="md:col-span-3 bg-white rounded-2xl shadow-lg hover:shadow-xl transition p-4 flex flex-col">
           <div className="bg-[#0B3C78] text-white px-4 py-2 font-semibold rounded-t-2xl text-lg">Daily Updates</div>
           <div className="p-4 space-y-4 overflow-y-auto max-h-52">
             {loadingUpdates ? <p className="text-gray-500 text-sm">Loading updates...</p> :
@@ -290,7 +289,7 @@ const saveEvent = async () => {
           </div>
         </div>
 
-        {/* Academic Highlight */}
+        {/* Academic Highlight 
         <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition">
           <div className="bg-[#D97706] text-white px-4 py-2 font-semibold rounded-t-2xl text-lg flex justify-between items-center">
             Academic Highlights
@@ -320,7 +319,7 @@ const saveEvent = async () => {
   <p className="text-gray-500">No academic highlight available.</p>
 )}
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* -------------------- EVENTS CAROUSEL -------------------- */}
