@@ -51,13 +51,13 @@ const { data: events, refetch: refetchEvents } = useFetch("/events");
 const { data: facultyList, loading: loadingFaculty } = useFetch("/faculty");
 
   /* -------------------- HIGHLIGHT STATE -------------------- */
-  const [highlights, setHighlights] = useState([]);
+ 
+const [highlight, setHighlight] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingHighlightId, setEditingHighlightId] = useState(null);
-
   const [highlightTitle, setHighlightTitle] = useState("");
   const [highlightDesc, setHighlightDesc] = useState("");
-const [highlightLink, setHighlightLink] = useState("");
+
+
   /* -------------------- EVENT MODAL STATE -------------------- */
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
@@ -72,18 +72,17 @@ const [eventForm, setEventForm] = useState({
   const eventTimerRef = useRef(null);
 
   /* -------------------- FETCH HIGHLIGHT -------------------- */
-  useEffect(() => {
-  const fetchHighlights = async () => {
-    try {
-      const res = await API.get("/academic-highlights");
-      setHighlights(res.data);
-    } catch (err) {
-      console.error("Failed to fetch academic highlights:", err);
-    }
-  };
-  fetchHighlights();
-}, []);
-
+   useEffect(() => {
+    const fetchHighlight = async () => {
+      try {
+        const res = await API.get("/academic-highlights");
+        if (res.data.length) setHighlight(res.data[0]);
+      } catch (err) {
+        console.error("Failed to fetch academic highlight:", err);
+      }
+    };
+    fetchHighlight();
+  }, []);
   /* -------------------- AUTOMATIC EVENT SLIDE -------------------- */
   useEffect(() => {
     if (!events || events.length === 0) return;
@@ -172,39 +171,21 @@ const saveEvent = async () => {
   };
 
   /* -------------------- SAVE HIGHLIGHT -------------------- */
-  const saveHighlight = async () => {
-  if (!highlightTitle.trim() || !highlightDesc.trim()) {
-    alert("Please enter both title and description!");
-    return;
-  }
-
-  try {
-    if (editingHighlightId) {
-      // UPDATE
-      await API.put(`/academic-highlights/${editingHighlightId}`, {
-        title: highlightTitle,
-        description: highlightDesc,
-        link: highlightLink || null,
-      });
-    } else {
-      // CREATE
+   const saveHighlight = async () => {
+    if (!highlightTitle.trim() || !highlightDesc.trim()) return alert("Please enter both title and description!");
+    try {
       await API.post("/academic-highlights", {
         title: highlightTitle,
         description: highlightDesc,
-        link: highlightLink || null,
       });
+      const res = await API.get("/academic-highlights");
+      setHighlight(res.data[0]);
+      setModalOpen(false);
+    } catch (err) {
+      console.error("Failed to save highlight:", err);
+      alert("Failed to save. Try again!");
     }
-
-    const res = await API.get("/academic-highlights");
-    setHighlights(res.data);
-
-    setEditingHighlightId(null);
-    setModalOpen(false);
-  } catch (err) {
-    console.error("Failed to save highlight:", err);
-    alert("Save failed. Try again!");
-  }
-};
+  };
 
   /* -------------------- QUICK LINKS -------------------- */
  const quickLinks = [
@@ -264,64 +245,64 @@ const saveEvent = async () => {
       </div>
 
       {/* -------------------- UPDATES + HIGHLIGHT -------------------- */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 grid md:grid-cols-3 gap-6 mb-12">
-        {/* Daily Updates */}
-        <div className="md:col-span-2 bg-white rounded-2xl shadow-lg hover:shadow-xl transition p-4 flex flex-col">
-          <div className="bg-[#0B3C78] text-white px-4 py-2 font-semibold rounded-t-2xl text-lg">Daily Updates</div>
-          <div className="p-4 space-y-4 overflow-y-auto max-h-52">
-            {loadingUpdates ? <p className="text-gray-500 text-sm">Loading updates...</p> :
-              updates.length === 0 ? <p className="text-gray-500 text-sm">No updates found.</p> :
-                updates.map(u => (
-                  <div key={u.id} className="border-b pb-2 last:border-b-0 relative">
-                    <h3 className="font-semibold text-gray-800 text-base">{u.title}</h3>
-                    <p className="text-gray-700 text-sm line-clamp-2">{u.description}</p>
-                    {u.file_url && (
-                      <a href={`${API.baseURL}${u.file_url}`} download className="absolute top-0 right-0 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                        <Download className="w-3 h-3" /> Download
-                      </a>
-                    )}
-                  </div>
-                ))}
-          </div>
-          <div className="text-center mt-3">
-            <button onClick={() => navigate("/daily-updates")} className="bg-[#0B3C78] hover:bg-blue-900 text-white px-4 py-1 rounded-lg text-sm transition">
-              View All
-            </button>
-          </div>
-        </div>
+      {/* -------------------- UPDATES + HIGHLIGHT -------------------- */}
+<div className="max-w-7xl mx-auto px-4 sm:px-6 grid md:grid-cols-3 gap-6 mb-12">
 
-        {/* Academic Highlight */}
-        <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition">
-          <div className="bg-[#D97706] text-white px-4 py-2 font-semibold rounded-t-2xl text-lg flex justify-between items-center">
-            Academic Highlights
-            <button
-  onClick={() => {
-    const h = highlights[0];
-    if (!h) return;
+  {/* Daily Updates */}
+  <div className="md:col-span-2 bg-white rounded-2xl shadow-lg hover:shadow-xl transition p-4 flex flex-col">
+    <div className="bg-[#0B3C78] text-white px-4 py-2 font-semibold rounded-t-2xl text-lg">
+      Daily Updates
+    </div>
 
-    setHighlightTitle(h.title);
-    setHighlightDesc(h.description);
-    setHighlightLink(h.link || "");
-    setEditingHighlightId(h.id);
-    setModalOpen(true);
-  }}
-  className="hover:bg-orange-700 p-1 rounded"
->
-  <Edit className="w-5 h-5 text-white" />
-</button>
+    <div className="p-4 space-y-4 overflow-y-auto max-h-52">
+      {loadingUpdates ? (
+        <p className="text-gray-500 text-sm">Loading updates...</p>
+      ) : updates.length === 0 ? (
+        <p className="text-gray-500 text-sm">No updates found.</p>
+      ) : (
+        updates.map(u => (
+          <div key={u.id} className="border-b pb-2 last:border-b-0 relative">
+            <h3 className="font-semibold text-gray-800 text-base">{u.title}</h3>
+            <p className="text-gray-700 text-sm line-clamp-2">{u.description}</p>
           </div>
-          <div className="p-4 space-y-3 text-gray-700 text-base max-h-44 overflow-y-auto">
-{highlights.length > 0 ? (
-  <>
-    <p><span className="font-semibold">Title:</span> {highlights[0].title}</p>
-    <p><span className="font-semibold">Description:</span> {highlights[0].description}</p>
-  </>
-) : (
-  <p className="text-gray-500">No academic highlight available.</p>
-)}
-          </div>
-        </div>
-      </div>
+        ))
+      )}
+    </div>
+  </div>
+
+  {/* Academic Highlight */}
+  <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition">
+    <div className="bg-[#D97706] text-white px-4 py-2 font-semibold rounded-t-2xl text-lg flex justify-between items-center">
+      Academic Highlights
+      <button
+        onClick={() => {
+          setHighlightTitle(highlight?.title || "");
+          setHighlightDesc(highlight?.description || "");
+          setModalOpen(true);
+        }}
+        className="hover:bg-orange-700 p-1 rounded"
+      >
+        <Edit className="w-5 h-5 text-white" />
+      </button>
+    </div>
+
+    <div className="p-4 space-y-3 text-gray-700 text-base max-h-44 overflow-y-auto">
+      {highlight ? (
+        <>
+          <p>
+            <span className="font-semibold">Title:</span> {highlight.title}
+          </p>
+          <p>
+            <span className="font-semibold">Description:</span> {highlight.description}
+          </p>
+        </>
+      ) : (
+        <p className="text-gray-500">No academic highlight available.</p>
+      )}
+    </div>
+  </div>
+
+</div>
 
       {/* -------------------- EVENTS CAROUSEL -------------------- */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition p-4 mb-12">
