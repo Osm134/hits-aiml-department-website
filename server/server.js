@@ -748,67 +748,62 @@ app.get("/students", (_, res) => res.redirect("/students-rep"));
 
 /* ================= ACADEMIC HIGHLIGHTS ================= */
 
-
-
-// ================= GET Latest Highlight =================
-app.get("/academic-highlights", async (_, res) => {
+// GET all academic highlights
+app.get("/academic-highlights", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM academic_highlights ORDER BY created_at DESC LIMIT 1"
+    const { rows } = await pool.query(
+      "SELECT * FROM academic_highlights ORDER BY created_at DESC"
     );
-
-    res.json(result.rows[0] || null);
+    res.json(rows);
   } catch (err) {
-    console.error("Fetch highlight error:", err);
-    res.status(500).json({ message: "Failed to fetch academic highlight" });
+    console.error("❌ Failed to fetch academic highlights:", err);
+    res.status(500).json({ message: "Failed to fetch academic highlights" });
   }
 });
 
-
-// ================= CREATE or UPDATE Highlight =================
+// CREATE new academic highlight
 app.post("/academic-highlights", async (req, res) => {
   try {
-    const { title, description } = req.body;
-
-    if (!title || !description) {
-      return res.status(400).json({ message: "Title and Description required" });
-    }
-
-    // Check if one row already exists
-    const existing = await pool.query(
-      "SELECT id FROM academic_highlights LIMIT 1"
+    const { title, description, link } = req.body;
+    const { rows } = await pool.query(
+      "INSERT INTO academic_highlights(title, description, link) VALUES($1, $2, $3) RETURNING *",
+      [title, description, link]
     );
-
-    let result;
-
-    if (existing.rows.length > 0) {
-      // UPDATE existing row
-      result = await pool.query(
-        `UPDATE academic_highlights
-         SET title=$1, description=$2, created_at=NOW()
-         WHERE id=$3
-         RETURNING *`,
-        [title, description, existing.rows[0].id]
-      );
-    } else {
-      // INSERT new row
-      result = await pool.query(
-        `INSERT INTO academic_highlights(title, description)
-         VALUES($1,$2)
-         RETURNING *`,
-        [title, description]
-      );
-    }
-
-    res.json(result.rows[0]);
+    res.status(201).json(rows[0]);
   } catch (err) {
-    console.error("Academic highlight error:", err);
-    res.status(500).json({ message: "Failed to create/update academic highlight" });
+    console.error("❌ Failed to create academic highlight:", err);
+    res.status(500).json({ message: "Failed to create academic highlight" });
   }
 });
 
+// UPDATE an academic highlight
+app.put("/academic-highlights/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, link } = req.body;
+    const { rows } = await pool.query(
+      "UPDATE academic_highlights SET title=$1, description=$2, link=$3 WHERE id=$4 RETURNING *",
+      [title, description, link, id]
+    );
+    if (!rows.length) return res.status(404).json({ message: "Highlight not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("❌ Failed to update academic highlight:", err);
+    res.status(500).json({ message: "Failed to update academic highlight" });
+  }
+});
 
-
+// DELETE an academic highlight
+app.delete("/academic-highlights/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM academic_highlights WHERE id=$1", [id]);
+    res.json({ message: "Academic highlight deleted ✅" });
+  } catch (err) {
+    console.error("❌ Failed to delete academic highlight:", err);
+    res.status(500).json({ message: "Failed to delete academic highlight" });
+  }
+});
 
 
 /* ================= HEALTH ================= */
