@@ -72,17 +72,17 @@ const [eventForm, setEventForm] = useState({
   const eventTimerRef = useRef(null);
 
   /* -------------------- FETCH HIGHLIGHT -------------------- */
-   useEffect(() => {
-    const fetchHighlight = async () => {
-      try {
-        const res = await API.get("/academic-highlights");
-        if (res.data.length) setHighlight(res.data[0]);
-      } catch (err) {
-        console.error("Failed to fetch academic highlight:", err);
-      }
-    };
-    fetchHighlight();
-  }, []);
+  useEffect(() => {
+  const fetchHighlight = async () => {
+    try {
+      const res = await API.get("/academic-highlights");
+      if (res.data) setHighlight(res.data);
+    } catch (err) {
+      console.error("Failed to fetch academic highlight:", err);
+    }
+  };
+  fetchHighlight();
+}, []);
   /* -------------------- AUTOMATIC EVENT SLIDE -------------------- */
   useEffect(() => {
     if (!events || events.length === 0) return;
@@ -171,22 +171,26 @@ const saveEvent = async () => {
   };
 
   /* -------------------- SAVE HIGHLIGHT -------------------- */
-   const saveHighlight = async () => {
-    if (!highlightTitle.trim() || !highlightDesc.trim()) return alert("Please enter both title and description!");
-    try {
-      await API.post("/academic-highlights", {
-        title: highlightTitle,
-        description: highlightDesc,
-      });
-      const res = await API.get("/academic-highlights");
-      setHighlight(res.data[0]);
-      setModalOpen(false);
-    } catch (err) {
-      console.error("Failed to save highlight:", err);
-      alert("Failed to save. Try again!");
-    }
-  };
+  const saveHighlight = async () => {
+  if (!highlightTitle.trim() || !highlightDesc.trim()) {
+    return alert("Please enter both title and description!");
+  }
 
+  try {
+    await API.post("/academic-highlights", {
+      title: highlightTitle,
+      description: highlightDesc,
+    });
+
+    const res = await API.get("/academic-highlights");
+    setHighlight(res.data);
+
+    setModalOpen(false);
+  } catch (err) {
+    console.error("Failed to save highlight:", err);
+    alert("Failed to save. Try again!");
+  }
+};
   /* -------------------- QUICK LINKS -------------------- */
  const quickLinks = [
   { title: "Previous Papers", path: "/academics", state: { section: "papers" }, icon: <FileText className="w-8 h-8 mb-1" />, color: "from-green-400 to-green-600" },

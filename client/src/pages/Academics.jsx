@@ -103,8 +103,12 @@ export default function Academics() {
               activeType === t ? "bg-blue-600 text-white" : "bg-gray-200"
             }`}
           >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
+{
+  t === "syllabus" ? "Academic Syllabus" :
+  t === "previous" ? "Previous Question Papers" :
+  t === "notes" ? "Academic Calendar" :
+  "Exam Calendar"
+}          </button>
         ))}
       </div>
 
