@@ -281,6 +281,7 @@ const saveEvent = async () => {
                     )}
                   </div>
                 ))}
+                
           </div>
           <div className="text-center mt-3">
             <button onClick={() => navigate("/daily-updates")} className="bg-[#0B3C78] hover:bg-blue-900 text-white px-4 py-1 rounded-lg text-sm transition">

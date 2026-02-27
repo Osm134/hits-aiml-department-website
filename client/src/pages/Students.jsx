@@ -7,6 +7,8 @@ import Internship from "../components/Internships";
 
 const API = process.env.REACT_APP_API_URL;
 
+
+
 // --- CLUB MODALS ---
 const CreateClubModal = ({ isOpen, onClose, refreshClubs }) => {
   const [name, setName] = useState("");
