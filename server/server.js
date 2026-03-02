@@ -208,7 +208,7 @@ const upload = multer({ storage: academicStorage });
 app.get("/academics", async (req, res) => {
   try {
     const { rows } = await pool.query(
-      "SELECT * FROM academics ORDER BY created_at DESC"
+      "SELECT * FROM academics_new ORDER BY created_at DESC"
     );
     res.json(rows);
   } catch (err) {
@@ -236,7 +236,7 @@ app.post("/academics", upload.single("file"), async (req, res) => {
     const cloud_public_id = req.file.filename;
 
     const { rows } = await pool.query(
-      `INSERT INTO academics
+      `INSERT INTO academics_new
        (title, semester, subject, type, image_url, cloud_public_id)
        VALUES($1,$2,$3,$4,$5,$6)
        RETURNING *`,
@@ -261,7 +261,7 @@ app.put("/academics/:id", upload.single("file"), async (req, res) => {
     const { title, semester, subject, type } = req.body;
 
     const existing = await pool.query(
-      "SELECT cloud_public_id FROM academics WHERE id=$1",
+      "SELECT cloud_public_id FROM academics_new WHERE id=$1",
       [id]
     );
 
@@ -284,7 +284,7 @@ app.put("/academics/:id", upload.single("file"), async (req, res) => {
       cloud_public_id = req.file.filename;
     } else {
       const current = await pool.query(
-        "SELECT image_url, cloud_public_id FROM academics WHERE id=$1",
+        "SELECT image_url, cloud_public_id FROM academics_new WHERE id=$1",
         [id]
       );
       image_url = current.rows[0].image_url;
@@ -292,7 +292,7 @@ app.put("/academics/:id", upload.single("file"), async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `UPDATE academics
+      `UPDATE academics_new
        SET title=$1, semester=$2, subject=$3, type=$4,
            image_url=$5, cloud_public_id=$6
        WHERE id=$7 RETURNING *`,
@@ -316,7 +316,7 @@ app.delete("/academics/:id", async (req, res) => {
     const { id } = req.params;
 
     const { rows } = await pool.query(
-      "SELECT cloud_public_id FROM academics WHERE id=$1",
+      "SELECT cloud_public_id FROM academics_new WHERE id=$1",
       [id]
     );
 
@@ -329,7 +329,7 @@ app.delete("/academics/:id", async (req, res) => {
       await cloudinary.uploader.destroy(`academics/${publicId}`);
     }
 
-    await pool.query("DELETE FROM academics WHERE id=$1", [id]);
+    await pool.query("DELETE FROM academics_new WHERE id=$1", [id]);
 
     res.json({ message: "Deleted successfully ✅" });
 
