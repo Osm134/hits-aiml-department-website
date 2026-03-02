@@ -143,35 +143,83 @@ app.delete("/events/:id", async (req, res) => {
 
 
 
+// ---------- EVENTS ----------
+app.post("/events", uploadImage("events").single("image"), async (req, res) => {
+  try {
+    const { title, description, date } = req.body;
+    const image_url = req.file?.path || null;
+    const result = await pool.query(
+      "INSERT INTO events(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
+      [title, description, date, image_url]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create event." });
+  }
+});
 
+app.get("/events", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM events ORDER BY date DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch events." });
+  }
+});
   
 // ---------------- CLOUDINARY STORAGE ----------------
 
-// Multer + Cloudinary Storage
+// ==================================================
+// CLOUDINARY + MULTER SETUP
+// ==================================================
+
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
+
+// Cloudinary Config
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_KEY,
+  api_secret: process.env.CLOUD_SECRET,
+});
+
+// Storage Configuration
 const academicStorage = new CloudinaryStorage({
-  cloudinary: cloud,
+  cloudinary,
   params: async (req, file) => {
-    // Generate readable filename
     const semester = req.body.semester || "unknown";
-    const title = req.body.title || "file";
-    const safeName = `${semester}_${title}`.replace(/\s+/g, "_").substring(0, 50); // max 50 chars
+    const title = req.body.title || "image";
+
+    const safeName = `${semester}_${title}`
+      .replace(/[^a-zA-Z0-9]/g, "_")
+      .substring(0, 40);
 
     return {
       folder: "academics",
       public_id: safeName,
-      resource_type: "raw",
-      format: "pdf",      // force PDF
-      type: "upload",     // public upload
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [
+        { width: 1000, height: 1000, crop: "limit" },
+        { quality: "auto", fetch_format: "auto" }
+      ],
     };
   },
 });
 
 const upload = multer({ storage: academicStorage });
 
-// -------- GET ALL ACADEMICS --------
+
+// ==================================================
+// GET ALL IMAGES
+// ==================================================
 app.get("/academics", async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM academics ORDER BY created_at DESC");
+    const { rows } = await pool.query(
+      "SELECT * FROM academics ORDER BY created_at DESC"
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -179,46 +227,127 @@ app.get("/academics", async (req, res) => {
   }
 });
 
-// -------- UPLOAD ACADEMIC PDF --------
+
+// ==================================================
+// UPLOAD IMAGE
+// ==================================================
 app.post("/academics", upload.single("file"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+    if (!req.file)
+      return res.status(400).json({ message: "No image uploaded" });
 
     const { title, semester, subject, type } = req.body;
-    const file_url = req.file.path;          // Cloudinary URL
-    const cloud_public_id = req.file.filename || req.file.public_id;
+
+    if (!title || !semester || !subject || !type) {
+      return res.status(400).json({ message: "All fields required" });
+    }
+
+    const image_url = req.file.path;
+    const cloud_public_id = req.file.filename;
 
     const { rows } = await pool.query(
-      `INSERT INTO academics(title, semester, subject, type, file_url, cloud_public_id)
-       VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [title, semester, subject, type, file_url, cloud_public_id]
+      `INSERT INTO academics
+       (title, semester, subject, type, image_url, cloud_public_id)
+       VALUES($1,$2,$3,$4,$5,$6)
+       RETURNING *`,
+      [title, semester, subject, type, image_url, cloud_public_id]
     );
 
     res.status(201).json(rows[0]);
+
   } catch (err) {
     console.error("Upload failed:", err);
     res.status(500).json({ message: "Upload failed", error: err.message });
   }
 });
 
-// -------- DELETE ACADEMIC PDF --------
+
+// ==================================================
+// UPDATE IMAGE (OPTIONAL BUT PROFESSIONAL)
+// ==================================================
+app.put("/academics/:id", upload.single("file"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, semester, subject, type } = req.body;
+
+    const existing = await pool.query(
+      "SELECT cloud_public_id FROM academics WHERE id=$1",
+      [id]
+    );
+
+    if (!existing.rows.length) {
+      return res.status(404).json({ message: "Not found" });
+    }
+
+    let image_url, cloud_public_id;
+
+    // If new image uploaded
+    if (req.file) {
+      const oldPublicId = existing.rows[0].cloud_public_id;
+
+      // Delete old image
+      if (oldPublicId) {
+        await cloudinary.uploader.destroy(`academics/${oldPublicId}`);
+      }
+
+      image_url = req.file.path;
+      cloud_public_id = req.file.filename;
+    } else {
+      const current = await pool.query(
+        "SELECT image_url, cloud_public_id FROM academics WHERE id=$1",
+        [id]
+      );
+      image_url = current.rows[0].image_url;
+      cloud_public_id = current.rows[0].cloud_public_id;
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE academics
+       SET title=$1, semester=$2, subject=$3, type=$4,
+           image_url=$5, cloud_public_id=$6
+       WHERE id=$7 RETURNING *`,
+      [title, semester, subject, type, image_url, cloud_public_id, id]
+    );
+
+    res.json(rows[0]);
+
+  } catch (err) {
+    console.error("Update failed:", err);
+    res.status(500).json({ message: "Update failed" });
+  }
+});
+
+
+// ==================================================
+// DELETE IMAGE
+// ==================================================
 app.delete("/academics/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { rows } = await pool.query("SELECT cloud_public_id FROM academics WHERE id=$1", [id]);
-    if (!rows.length) return res.status(404).json({ message: "Not found" });
+
+    const { rows } = await pool.query(
+      "SELECT cloud_public_id FROM academics WHERE id=$1",
+      [id]
+    );
+
+    if (!rows.length)
+      return res.status(404).json({ message: "Not found" });
 
     const publicId = rows[0].cloud_public_id;
-    if (publicId) await cloud.uploader.destroy(`academics/${publicId}`, { resource_type: "raw" });
+
+    if (publicId) {
+      await cloudinary.uploader.destroy(`academics/${publicId}`);
+    }
 
     await pool.query("DELETE FROM academics WHERE id=$1", [id]);
-    res.json({ message: "Deleted ✅" });
+
+    res.json({ message: "Deleted successfully ✅" });
+
   } catch (err) {
     console.error("Delete failed:", err);
     res.status(500).json({ message: "Delete failed", error: err.message });
   }
 });
-
 
 
 
@@ -565,31 +694,7 @@ app.post("/clubs/:id/join", async (req, res) => {
   }
 });
 
-// ---------- EVENTS ----------
-app.post("/events", uploadImage("events").single("image"), async (req, res) => {
-  try {
-    const { title, description, date } = req.body;
-    const image_url = req.file?.path || null;
-    const result = await pool.query(
-      "INSERT INTO events(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
-      [title, description, date, image_url]
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to create event." });
-  }
-});
 
-app.get("/events", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM events ORDER BY date DESC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch events." });
-  }
-});
 
 // ---------- DAILY UPDATES ----------
 app.post("/updates", uploadImage("updates").single("image"), async (req, res) => {
