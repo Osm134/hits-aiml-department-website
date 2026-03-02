@@ -2,8 +2,12 @@ import { useEffect, useState } from "react";
 import { FiUpload, FiTrash2, FiEye, FiEdit } from "react-icons/fi";
 
 const semesters = [2, 3, 4, 5, 6, 7, 8];
-const types = ["notes", "papers", "syllabus", "previous"];
-
+const types = [
+  { value: "notes", label: "Lecture Notes" },
+  { value: "papers", label: "Mid Exam Papers" },
+  { value: "syllabus", label: "Course Syllabus" },
+  { value: "previous", label: "Previous Year Papers" },
+];
 export default function Academics() {
   const [data, setData] = useState([]);
   const [activeType, setActiveType] = useState("notes");
