@@ -144,30 +144,7 @@ app.delete("/events/:id", async (req, res) => {
 
 
 // ---------- EVENTS ----------
-app.post("/events", uploadImage("events").single("image"), async (req, res) => {
-  try {
-    const { title, description, date } = req.body;
-    const image_url = req.file?.path || null;
-    const result = await pool.query(
-      "INSERT INTO events(title, description, date, image_url) VALUES($1,$2,$3,$4) RETURNING *",
-      [title, description, date, image_url]
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to create event." });
-  }
-});
 
-app.get("/events", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM events ORDER BY date DESC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch events." });
-  }
-});
   
 // ---------------- CLOUDINARY STORAGE ----------------
 
@@ -178,7 +155,7 @@ app.get("/events", async (req, res) => {
 
 // Storage Configuration
 const academicStorage = new CloudinaryStorage({
-  cloudinary,
+  cloudinary: cloud,
   params: async (req, file) => {
     const semester = req.body.semester || "unknown";
     const title = req.body.title || "image";
