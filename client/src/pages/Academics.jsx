@@ -4,10 +4,10 @@ import { FiUpload, FiTrash2, FiEye, FiEdit } from "react-icons/fi";
 const semesters = [2, 3, 4, 5, 6, 7, 8];
 
 const types = [
-  { value: "notes", label: "Lecture Notes" },
-  { value: "papers", label: "Mid Exam Papers" },
-  { value: "syllabus", label: "Course Syllabus" },
-  { value: "previous", label: "Previous Year Papers" },
+  { value: "previous", label: "Previous Year Questions" },
+  { value: "notes", label: "Academic Calendar" },
+  { value: "papers", label: "Exam Time Table" },
+  { value: "syllabus", label: "Syllabus" },
 ];
 
 export default function Academics() {
