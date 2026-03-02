@@ -2,13 +2,17 @@ import { useEffect, useState } from "react";
 import { FiUpload, FiTrash2, FiEye, FiEdit } from "react-icons/fi";
 
 const semesters = [2, 3, 4, 5, 6, 7, 8];
+
 const types = [
   { value: "notes", label: "Lecture Notes" },
   { value: "papers", label: "Mid Exam Papers" },
   { value: "syllabus", label: "Course Syllabus" },
   { value: "previous", label: "Previous Year Papers" },
 ];
+
 export default function Academics() {
+  const API = process.env.REACT_APP_API_URL;
+
   const [data, setData] = useState([]);
   const [activeType, setActiveType] = useState("notes");
   const [openSem, setOpenSem] = useState(null);
@@ -22,9 +26,7 @@ export default function Academics() {
     file: null,
   });
 
-  const API = process.env.REACT_APP_API_URL;
-
-  // ================= FETCH =================
+  // ================= FETCH DATA =================
   const fetchData = async () => {
     try {
       const res = await fetch(`${API}/academics`);
@@ -42,10 +44,12 @@ export default function Academics() {
 
   // ================= DELETE =================
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this image?")) return;
+    if (!window.confirm("Delete this item?")) return;
 
     try {
-      await fetch(`${API}/academics/${id}`, { method: "DELETE" });
+      await fetch(`${API}/academics/${id}`, {
+        method: "DELETE",
+      });
       fetchData();
     } catch (err) {
       console.error(err);
@@ -76,7 +80,7 @@ export default function Academics() {
     setShowModal(true);
   };
 
-  // ================= HANDLE FILE =================
+  // ================= FILE CHANGE =================
   const handleFileChange = (e) => {
     setUploadInfo({ ...uploadInfo, file: e.target.files[0] });
   };
@@ -85,7 +89,9 @@ export default function Academics() {
   const handleUpload = async () => {
     const { semester, title, subject, file } = uploadInfo;
 
-    if (!title || !subject) return alert("All fields required");
+    if (!semester || !title || !subject) {
+      return alert("All fields are required");
+    }
 
     const formData = new FormData();
     formData.append("semester", semester);
@@ -93,7 +99,9 @@ export default function Academics() {
     formData.append("subject", subject);
     formData.append("type", activeType);
 
-    if (file) formData.append("file", file);
+    if (file) {
+      formData.append("file", file);
+    }
 
     try {
       const res = await fetch(
@@ -118,23 +126,26 @@ export default function Academics() {
   // ================= UI =================
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6 text-center">
+      <h1 className="text-3xl font-bold text-center mb-6">
         HITS AIML Academics
       </h1>
 
       {/* TYPE TABS */}
-      <div className="flex flex-wrap justify-center gap-2 mb-6">
+      <div className="flex flex-wrap justify-center gap-3 mb-8">
         {types.map((t) => (
           <button
-            key={t}
-            onClick={() => setActiveType(t)}
-            className={`px-4 py-2 rounded-full font-semibold ${
-              activeType === t
+            key={t.value}
+            onClick={() => {
+              setActiveType(t.value);
+              setOpenSem(null);
+            }}
+            className={`px-5 py-2 rounded-full font-semibold transition ${
+              activeType === t.value
                 ? "bg-blue-600 text-white"
                 : "bg-gray-200 hover:bg-gray-300"
             }`}
           >
-            {t}
+            {t.label}
           </button>
         ))}
       </div>
@@ -142,21 +153,26 @@ export default function Academics() {
       {/* SEMESTERS */}
       {semesters.map((sem) => {
         const semData = data.filter(
-          (d) => d.semester === sem && d.type === activeType
+          (item) => item.semester === sem && item.type === activeType
         );
 
         return (
-          <div key={sem} className="mb-4 bg-white shadow rounded-lg">
+          <div key={sem} className="mb-5 bg-white shadow rounded-lg overflow-hidden">
+            {/* HEADER */}
             <button
-              className="w-full px-6 py-3 bg-gray-100 flex justify-between"
               onClick={() => setOpenSem(openSem === sem ? null : sem)}
+              className="w-full px-6 py-4 bg-gray-100 flex justify-between items-center font-semibold"
             >
-              Semester {sem} {openSem === sem ? "−" : "+"}
+              <span>Semester {sem}</span>
+              <span>{openSem === sem ? "−" : "+"}</span>
             </button>
 
+            {/* COLLAPSE CONTENT */}
             {openSem === sem && (
-              <div className="p-4">
-                <div className="flex justify-end mb-4">
+              <div className="p-6">
+
+                {/* UPLOAD BUTTON */}
+                <div className="flex justify-end mb-6">
                   <button
                     onClick={() => openUploadModal(sem)}
                     className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
@@ -165,25 +181,26 @@ export default function Academics() {
                   </button>
                 </div>
 
-                {semData.length ? (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* DATA GRID */}
+                {semData.length > 0 ? (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {semData.map((item) => (
                       <div
                         key={item.id}
-                        className="p-4 bg-gray-50 rounded shadow"
+                        className="bg-gray-50 p-4 rounded-lg shadow"
                       >
                         <img
                           src={item.image_url}
                           alt={item.title}
-                          className="w-full h-40 object-cover rounded mb-2"
+                          className="w-full h-40 object-cover rounded mb-3"
                         />
 
-                        <p className="font-semibold">{item.title}</p>
-                        <small className="text-gray-500">
+                        <h3 className="font-semibold">{item.title}</h3>
+                        <p className="text-sm text-gray-500 mb-3">
                           Subject: {item.subject}
-                        </small>
+                        </p>
 
-                        <div className="flex gap-2 mt-3">
+                        <div className="flex gap-2">
                           <a
                             href={item.image_url}
                             target="_blank"
@@ -212,7 +229,7 @@ export default function Academics() {
                   </div>
                 ) : (
                   <p className="text-center text-gray-400">
-                    No images uploaded.
+                    No content available.
                   </p>
                 )}
               </div>
@@ -224,9 +241,9 @@ export default function Academics() {
       {/* MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96">
+          <div className="bg-white p-6 rounded-lg w-96 shadow-lg">
             <h2 className="text-xl font-bold mb-4">
-              {editId ? "Update Image" : "Upload Image"}
+              {editId ? "Update Item" : "Upload Item"}
             </h2>
 
             <input
@@ -236,7 +253,7 @@ export default function Academics() {
               onChange={(e) =>
                 setUploadInfo({ ...uploadInfo, title: e.target.value })
               }
-              className="w-full mb-2 p-2 border rounded"
+              className="w-full mb-3 p-2 border rounded"
             />
 
             <input
@@ -246,7 +263,7 @@ export default function Academics() {
               onChange={(e) =>
                 setUploadInfo({ ...uploadInfo, subject: e.target.value })
               }
-              className="w-full mb-2 p-2 border rounded"
+              className="w-full mb-3 p-2 border rounded"
             />
 
             <input
@@ -256,13 +273,14 @@ export default function Academics() {
               className="w-full mb-4"
             />
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 bg-gray-400 text-white rounded"
               >
                 Cancel
               </button>
+
               <button
                 onClick={handleUpload}
                 className="px-4 py-2 bg-green-600 text-white rounded"
